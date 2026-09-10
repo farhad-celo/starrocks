@@ -31,7 +31,9 @@ import static com.starrocks.sql.analyzer.AnalyzeTestUtil.analyzeFail;
 import static com.starrocks.sql.analyzer.AnalyzeTestUtil.analyzeSuccess;
 
 public class CelonisCreateAlignmentV2Test {
-    private static final long ALL_FIELDS_MASK = 140737488355327L;
+    private static final int LEGACY_FIELD_COUNT = 47;
+    private static final long ALL_V1_FIELDS_MASK = (1L << LEGACY_FIELD_COUNT) - 1;
+    private static final long ALL_FIELDS_MASK = (1L << 53) - 1;
     private static final List<String> FIELD_NAMES = Arrays.asList(
             "alignment_model_vertex_id",
             "alignment_vertex_label",
@@ -79,7 +81,13 @@ public class CelonisCreateAlignmentV2Test {
             "EXCLUSIVE_VIOLATION_move_type",
             "EXCLUSIVE_VIOLATION_deviation_category",
             "EXCLUSIVE_VIOLATION_edge_class",
-            "EXCLUSIVE_VIOLATION_alignment_index");
+            "EXCLUSIVE_VIOLATION_alignment_index",
+            "INCOMPLETE_VIOLATION_model_vertex_id",
+            "INCOMPLETE_VIOLATION_vertex_label",
+            "INCOMPLETE_VIOLATION_move_type",
+            "INCOMPLETE_VIOLATION_deviation_category",
+            "INCOMPLETE_VIOLATION_edge_class",
+            "INCOMPLETE_VIOLATION_alignment_index");
 
     @BeforeAll
     public static void beforeClass() throws Exception {
@@ -89,7 +97,7 @@ public class CelonisCreateAlignmentV2Test {
 
     @Test
     public void testEverySingleFieldMask() {
-        Assertions.assertEquals(47, FIELD_NAMES.size());
+        Assertions.assertEquals(53, FIELD_NAMES.size());
         for (int bit = 0; bit < FIELD_NAMES.size(); ++bit) {
             StructType type = analyzeV2Type(Long.toString(1L << bit));
             Assertions.assertEquals(1, type.getFields().size(), "bit " + bit);
@@ -107,14 +115,34 @@ public class CelonisCreateAlignmentV2Test {
                 "SYNC_EDGE_edge_class", "SYNC_EDGE_alignment_index");
         assertFields(analyzeV2Type(Long.toString((1L << 46) | 1L)), "alignment_model_vertex_id",
                 "EXCLUSIVE_VIOLATION_alignment_index");
+        assertFields(analyzeV2Type(Long.toString((1L << 52) | (1L << 47) | 1L)),
+                "alignment_model_vertex_id", "INCOMPLETE_VIOLATION_model_vertex_id",
+                "INCOMPLETE_VIOLATION_alignment_index");
     }
 
     @Test
-    public void testAllFieldsMatchesLegacySchema() {
+    public void testLegacySchemaRemainsUnchanged() {
         StructType legacyType = analyzeType("celonis_create_alignment(cast([] as array<varchar>), '{}')");
-        StructType v2Type = analyzeV2Type(Long.toString(ALL_FIELDS_MASK));
-        Assertions.assertEquals(legacyType, v2Type);
-        Assertions.assertEquals(47, v2Type.getFields().size());
+        StructType projectedV2Type = analyzeV2Type(Long.toString(ALL_V1_FIELDS_MASK));
+        Assertions.assertEquals(legacyType, projectedV2Type);
+        Assertions.assertEquals(LEGACY_FIELD_COUNT, legacyType.getFields().size());
+    }
+
+    @Test
+    public void testTwoArgumentV2MatchesAllFieldsMask() {
+        StructType legacyType = analyzeType("celonis_create_alignment(cast([] as array<varchar>), '{}')");
+        StructType v2Type = analyzeV2Type();
+        StructType projectedV2Type = analyzeV2Type(Long.toString(ALL_FIELDS_MASK));
+
+        Assertions.assertEquals(projectedV2Type, v2Type);
+        Assertions.assertEquals(FIELD_NAMES.size(), v2Type.getFields().size());
+        for (int field = 0; field < v2Type.getFields().size(); ++field) {
+            Assertions.assertEquals(FIELD_NAMES.get(field), v2Type.getField(field).getName(), "field " + field);
+        }
+        for (int field = 0; field < LEGACY_FIELD_COUNT; ++field) {
+            Assertions.assertEquals(legacyType.getField(field).getName(), v2Type.getField(field).getName());
+            Assertions.assertEquals(legacyType.getField(field).getType(), v2Type.getField(field).getType());
+        }
     }
 
     @Test
@@ -131,7 +159,7 @@ public class CelonisCreateAlignmentV2Test {
     public void testInvalidMasksAndSignature() {
         analyzeFail(v2Sql("0"), "must be positive");
         analyzeFail(v2Sql("-1"), "must be positive");
-        analyzeFail(v2Sql("140737488355328"), "contains unknown bits");
+        analyzeFail(v2Sql("9007199254740992"), "contains unknown bits");
         analyzeFail(v2Sql("NULL"), "must not be NULL");
         analyzeFail(v2Sql("1 + 3"), "must be an integer literal or CAST(integer literal AS BIGINT)");
         analyzeFail(v2Sql("cast(257 as tinyint)"),
@@ -140,10 +168,13 @@ public class CelonisCreateAlignmentV2Test {
                 "must be an integer literal or CAST(integer literal AS BIGINT)");
         analyzeFail("select celonis_create_alignment_v2(cast([] as array<varchar>), '{}', v1) from t0",
                 "must be a constant BIGINT");
-        analyzeFail("select celonis_create_alignment_v2(cast([] as array<varchar>), '{}')",
-                "No matching function with signature");
+        analyzeSuccess("select celonis_create_alignment_v2(cast([] as array<varchar>), '{}')");
         analyzeFail("select celonis_create_alignment_v2(cast([] as array<varchar>), '{}', 1, 2)",
                 "No matching function with signature");
+    }
+
+    private static StructType analyzeV2Type() {
+        return analyzeType("celonis_create_alignment_v2(cast([] as array<varchar>), '{}')");
     }
 
     private static StructType analyzeV2Type(String mask) {

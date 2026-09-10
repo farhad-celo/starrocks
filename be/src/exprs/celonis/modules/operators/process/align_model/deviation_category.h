@@ -15,12 +15,13 @@ namespace celonis::accelerator::operators::process::align_model {
  * The conditions for these categories are explained below
  */
 enum class deviation_category : std::uint8_t {
-  CONFORMING = 1,       // is sync or gateway move
-  EXCESSIVE = 2,        // is log move & there is at least one sync move
-  MISSING = 3,          // is model move & trace has no log moves
-  OUT_OF_SEQUENCE = 4,  // is log or model move & trace has both log moves and model moves
-  UNDESIRED = 5,        // is log move & trace has no sync moves
-  UNMAPPED = 6          // is unmapped move
+  CONFORMING = 1,  // is sync or gateway move
+  EXCESSIVE = 2,   // is log move & there is at least one sync move
+  INCOMPLETE = 3,
+  MISSING = 4,          // is model move & trace has no log moves
+  OUT_OF_SEQUENCE = 5,  // is log or model move & trace has both log moves and model moves
+  UNDESIRED = 6,        // is log move & trace has no sync moves
+  UNMAPPED = 7,         // is unmapped move
 };
 
 using deviation_categories_for_case_t = ctl::static_array<deviation_category>;
@@ -41,11 +42,14 @@ using deviation_categories_for_cases_view_t = ctl::array_view<const deviation_ca
       return "UNDESIRED";
     case deviation_category::UNMAPPED:
       return "UNMAPPED";
+    case deviation_category::INCOMPLETE:
+      return "INCOMPLETE";
     default:
       ctl::assert_unreachable();
   }
 }
 
+enum class compute_incomplete_category : bool { YES = true, NO = false };
 /**
  * @brief Computes the deviation categories per move in each alignment in `alignments`. The result has the same
  * dimensions as `alignments`. If the `std::optional<alignment_t>` in the source range is nullopt, the corresponding
@@ -55,6 +59,7 @@ using deviation_categories_for_cases_view_t = ctl::array_view<const deviation_ca
  * Each element has the same size as the alignment of that index and contain a deviation category for each move in that
  * alignment.
  */
+template <compute_incomplete_category COMPUTE_V2>
 deviation_categories_for_cases_t compute_categories(const alignments_t& alignments);
 
 }  // namespace celonis::accelerator::operators::process::align_model

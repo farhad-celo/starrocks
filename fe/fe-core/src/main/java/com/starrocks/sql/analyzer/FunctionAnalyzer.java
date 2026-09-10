@@ -71,8 +71,11 @@ public class FunctionAnalyzer {
     private static final String ALIGNMENT_VERTEX_LABEL_FIELD_NAME = "alignment_vertex_label";
     private static final String ALIGNMENT_MOVE_TYPE_FIELD_NAME = "alignment_move_type";
     private static final String ALIGNMENT_ACTIVITY_INDEX_FIELD_NAME = "alignment_activity_index";
-    private static final int CREATE_ALIGNMENT_FIELD_COUNT = 47;
+    private static final int CREATE_ALIGNMENT_V1_FIELD_COUNT = 47;
+    private static final int CREATE_ALIGNMENT_FIELD_COUNT = 53;
     private static final long CREATE_ALIGNMENT_ALL_FIELDS_MASK = (1L << CREATE_ALIGNMENT_FIELD_COUNT) - 1;
+    private static final long CREATE_ALIGNMENT_ALL_V1_FIELDS_MASK =
+            (1L << CREATE_ALIGNMENT_V1_FIELD_COUNT) - 1;
     private static final List<CreateAlignmentOutputField> CREATE_ALIGNMENT_OUTPUT_FIELDS =
             createAlignmentOutputFields();
     private static final Set<String> SUPPORTED_TGT_TYPES = Sets.newTreeSet(String.CASE_INSENSITIVE_ORDER);
@@ -705,7 +708,7 @@ public class FunctionAnalyzer {
         fields.add(new CreateAlignmentOutputField("alignment_deviation_category", Type.ARRAY_VARCHAR));
 
         List<String> edgeTypes = Arrays.asList("SYNC_EDGE", "MODEL_EDGE", "SKIP_EDGE", "LOG_EDGE",
-                "UNMAPPED_EDGE", "MISSING_VIOLATION", "EXCLUSIVE_VIOLATION");
+                "UNMAPPED_EDGE", "MISSING_VIOLATION", "EXCLUSIVE_VIOLATION", "INCOMPLETE_VIOLATION");
         for (String edgeType : edgeTypes) {
             fields.add(new CreateAlignmentOutputField(edgeType + "_model_vertex_id", Type.ARRAY_BIGINT));
             fields.add(new CreateAlignmentOutputField(edgeType + "_vertex_label", Type.ARRAY_VARCHAR));
@@ -1042,7 +1045,7 @@ public class FunctionAnalyzer {
             fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_CREATE_ALIGNMENT, argumentTypes,
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
             fn = fn.copy();
-            fn.setRetType(createAlignmentStructType(CREATE_ALIGNMENT_ALL_FIELDS_MASK));
+            fn.setRetType(createAlignmentStructType(CREATE_ALIGNMENT_ALL_V1_FIELDS_MASK));
         } else if (FunctionSet.CELONIS_CREATE_ALIGNMENT_V2.equals(fnName)) {
             fn = Expr.getBuiltinFunction(FunctionSet.CELONIS_CREATE_ALIGNMENT_V2, argumentTypes,
                     Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
@@ -1050,7 +1053,9 @@ public class FunctionAnalyzer {
                 return null;
             }
             fn = fn.copy();
-            fn.setRetType(createAlignmentStructType(validateCreateAlignmentV2Mask(node)));
+            long mask = argumentTypes.length == 2 ? CREATE_ALIGNMENT_ALL_FIELDS_MASK :
+                    validateCreateAlignmentV2Mask(node);
+            fn.setRetType(createAlignmentStructType(mask));
         } else if (FunctionSet.CELONIS_PERCENTILE_DISC.equals(fnName)) {
             argumentTypes[1] = Type.DOUBLE;
             fn = Expr.getBuiltinFunction(fnName, argumentTypes, Function.CompareMode.IS_IDENTICAL);

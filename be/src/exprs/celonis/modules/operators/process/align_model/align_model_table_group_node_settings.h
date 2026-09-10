@@ -6,13 +6,14 @@
 
 namespace celonis::accelerator::operators::process::align_model {
 
-enum class align_model_version { V1, V2 };
+enum class align_model_version { V1, V2, V3 };
 
 [[nodiscard]] static constexpr std::string_view get_user_visible_operator_name(align_model_version version) noexcept {
   switch (version) {
     case align_model_version::V1:
       return "ALIGN_MODEL";
     case align_model_version::V2:
+    case align_model_version::V3:
       return "CREATE_ALIGNMENT";
   }
   return "";

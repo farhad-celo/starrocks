@@ -248,7 +248,7 @@ protected:
         std::vector<std::string> field_names = {"alignment_model_vertex_id", "alignment_vertex_label",
                                                 "alignment_move_type", "alignment_activity_index",
                                                 "alignment_deviation_category"};
-        for (auto type : ::celonis::accelerator::operators::process::align_model::CS_EDGE_TYPES) {
+        for (auto type : ::celonis::accelerator::operators::process::align_model::CS_EDGE_TYPES_V1) {
             children.push_back(celonis::array_type(TYPE_BIGINT));
             children.push_back(celonis::array_type(TYPE_VARCHAR));
             children.push_back(celonis::array_type(TYPE_VARCHAR));

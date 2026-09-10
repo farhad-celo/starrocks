@@ -4,6 +4,8 @@
 #include <bit>
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <regex>
 #include <string>
 #include <thread>
 #include <utility>
@@ -13,6 +15,7 @@
 #include "column/column_helper.h"
 #include "column/struct_column.h"
 #include "exprs/celonis/create_alignment.h"
+#include "exprs/celonis/modules/operators/process/align_model/align_model_helper.h"
 #include "exprs/celonis/modules/operators/process/align_model/v2/create_alignment_output_projection.h"
 #include "testutil/assert.h"
 #include "util.h"
@@ -23,8 +26,34 @@ namespace starrocks {
 namespace {
 
 using ::celonis::accelerator::operators::process::align_model::AlignModelHelper;
+using ::celonis::accelerator::operators::process::align_model::v2::association_output_column;
 using ::celonis::accelerator::operators::process::align_model::v2::create_alignment_output_projection;
 using ::celonis::accelerator::operators::process::align_model::v2::create_alignment_output_value_type;
+
+// With trace B, the gateways separate the missing A and incomplete C into distinct L1_MISSING components.
+constexpr const char* GATEWAY_SEPARATED_MODEL = R"json({
+    "nodes": [
+        {"node_id": "0", "node_type": 4},
+        {"node_id": "1", "node_type": 1, "task_name": "A"},
+        {"node_id": "2", "node_type": 2},
+        {"node_id": "3", "node_type": 1, "task_name": "B"},
+        {"node_id": "4", "node_type": 1, "task_name": "D"},
+        {"node_id": "5", "node_type": 2},
+        {"node_id": "6", "node_type": 1, "task_name": "C"},
+        {"node_id": "7", "node_type": 5}
+    ],
+    "edges": [
+        {"from": "0", "to": "1"},
+        {"from": "1", "to": "2"},
+        {"from": "2", "to": "3"},
+        {"from": "2", "to": "4"},
+        {"from": "3", "to": "5"},
+        {"from": "4", "to": "5"},
+        {"from": "5", "to": "6"},
+        {"from": "6", "to": "7"}
+    ],
+    "cache_key": "GATEWAY_SEPARATED_MODEL"
+})json";
 
 class CelonisCreateAlignmentV2Test : public testing::Test {
 protected:
@@ -72,15 +101,15 @@ protected:
     }
 
     static StatusOr<ColumnPtr> execute_with_variant_column(bool use_v2, ColumnPtr variant_column, size_t row_count,
-                                                           std::int64_t mask,
+                                                           std::optional<std::int64_t> mask,
                                                            const FunctionContext::TypeDesc& return_type,
                                                            const char* model_json) {
         Columns columns{std::move(variant_column),
                         ColumnHelper::create_const_column<TYPE_VARCHAR>(model_json, row_count)};
         std::vector<FunctionContext::TypeDesc> argument_types{celonis::array_type(TYPE_VARCHAR),
                                                               TypeDescriptor::from_logical_type(TYPE_VARCHAR)};
-        if (use_v2) {
-            columns.emplace_back(ColumnHelper::create_const_column<TYPE_BIGINT>(mask, row_count));
+        if (use_v2 && mask.has_value()) {
+            columns.emplace_back(ColumnHelper::create_const_column<TYPE_BIGINT>(mask.value(), row_count));
             argument_types.emplace_back(TypeDescriptor::from_logical_type(TYPE_BIGINT));
         }
 
@@ -104,7 +133,14 @@ protected:
     static StatusOr<ColumnPtr> execute(bool use_v2, const VariantRows& variants, std::int64_t mask,
                                        const FunctionContext::TypeDesc& return_type,
                                        const char* model_json = PARALLEL_MODEL) {
-        return execute_with_variant_column(use_v2, make_variant_column(variants), variants.size(), mask, return_type,
+        return execute_with_variant_column(use_v2, make_variant_column(variants), variants.size(),
+                                           std::optional<std::int64_t>{mask}, return_type, model_json);
+    }
+
+    static StatusOr<ColumnPtr> execute_v2_all_fields(const VariantRows& variants,
+                                                     const char* model_json = PARALLEL_MODEL) {
+        return execute_with_variant_column(true, make_variant_column(variants), variants.size(), std::nullopt,
+                                           make_return_type(create_alignment_output_projection::ALL_FIELDS_MASK),
                                            model_json);
     }
 
@@ -124,9 +160,13 @@ protected:
             ASSERT_NE(legacy->field_names().end(), legacy_iter);
             const auto legacy_field = std::distance(legacy->field_names().begin(), legacy_iter);
             for (size_t row = 0; row < row_count; ++row) {
-                EXPECT_TRUE(v2->fields()[v2_field]->equals(row, *legacy->fields()[legacy_field], row))
-                        << "field=" << field_name << " row=" << row << " v2=" << v2->fields()[v2_field]->debug_item(row)
-                        << " legacy=" << legacy->fields()[legacy_field]->debug_item(row);
+                const auto& v2_column{*v2->fields()[v2_field]};
+                const auto& v1_column{*legacy->fields()[legacy_field]};
+                EXPECT_TRUE(v2_column.equals(row, v1_column, row) ||
+                            (std::regex_replace(v2_column.debug_item(row), std::regex{"INCOMPLETE"}, "MISSING") ==
+                             v1_column.debug_item(row)))
+                        << "field=" << field_name << " row=" << row << " v2=" << v2_column.debug_item(row)
+                        << " legacy=" << v1_column.debug_item(row);
             }
         }
     }
@@ -134,8 +174,8 @@ protected:
     static void expect_v2_matches_legacy(std::uint64_t mask, const VariantRows& variants,
                                          const char* model_json = PARALLEL_MODEL) {
         const auto legacy_result =
-                execute(false, variants, create_alignment_output_projection::ALL_FIELDS_MASK,
-                        make_return_type(create_alignment_output_projection::ALL_FIELDS_MASK), model_json);
+                execute(false, variants, create_alignment_output_projection::ALL_FIELDS_V1_MASK,
+                        make_return_type(create_alignment_output_projection::ALL_FIELDS_V1_MASK), model_json);
         const auto v2_result = execute(true, variants, mask, make_return_type(mask), model_json);
         expect_results_match(mask, variants.size(), legacy_result, v2_result);
     }
@@ -145,8 +185,90 @@ protected:
     }
 };
 
-TEST_F(CelonisCreateAlignmentV2Test, AllFieldsMatchesLegacy) {
-    expect_v2_matches_legacy(create_alignment_output_projection::ALL_FIELDS_MASK);
+TEST_F(CelonisCreateAlignmentV2Test, AllV1FieldsMatchLegacy) {
+    expect_v2_matches_legacy(create_alignment_output_projection::ALL_FIELDS_V1_MASK);
+}
+
+TEST_F(CelonisCreateAlignmentV2Test, LegacyKeepsMissingDeviationSemantics) {
+    const auto result = execute(false, {{"A", "C"}}, create_alignment_output_projection::ALL_FIELDS_V1_MASK,
+                                make_return_type(create_alignment_output_projection::ALL_FIELDS_V1_MASK));
+    ASSERT_OK(result.status());
+
+    const auto* output = down_cast<const StructColumn*>(result.value().get());
+    ASSERT_EQ(create_alignment_output_projection::V1_FIELD_COUNT, output->fields().size());
+    const auto& deviation_categories = output->fields()[4]->debug_item(0);
+    EXPECT_NE(std::string::npos, deviation_categories.find("MISSING"));
+    EXPECT_EQ(std::string::npos, deviation_categories.find("INCOMPLETE"));
+}
+
+TEST_F(CelonisCreateAlignmentV2Test, TwoArgumentV2MatchesAllFieldsMask) {
+    const VariantRows variants{{"A", "C"}, {"A", "B", "C"}};
+    const auto all_fields_result = execute_v2_all_fields(variants);
+    const auto masked_result = execute(true, variants, create_alignment_output_projection::ALL_FIELDS_MASK,
+                                       make_return_type(create_alignment_output_projection::ALL_FIELDS_MASK));
+    ASSERT_OK(all_fields_result.status());
+    ASSERT_OK(masked_result.status());
+
+    const auto* all_fields = down_cast<const StructColumn*>(all_fields_result.value().get());
+    const auto* masked = down_cast<const StructColumn*>(masked_result.value().get());
+    ASSERT_EQ(create_alignment_output_projection::FIELD_COUNT, all_fields->fields().size());
+    ASSERT_EQ(masked->field_names(), all_fields->field_names());
+    for (size_t field = 0; field < all_fields->fields().size(); ++field) {
+        for (size_t row = 0; row < variants.size(); ++row) {
+            EXPECT_TRUE(all_fields->fields()[field]->equals(row, *masked->fields()[field], row))
+                    << "field=" << all_fields->field_names()[field] << " row=" << row;
+        }
+    }
+}
+
+TEST_F(CelonisCreateAlignmentV2Test, IncompleteOnlyProjectionIsPopulated) {
+    constexpr size_t incomplete_deviation_category_bit{
+            create_alignment_output_projection::V1_FIELD_COUNT +
+            static_cast<size_t>(association_output_column::DEVIATION_CATEGORY)};
+    constexpr std::uint64_t mask{std::uint64_t{1} << incomplete_deviation_category_bit};
+    const auto result = execute(true, {{"A", "C"}}, mask, make_return_type(mask));
+    ASSERT_OK(result.status());
+
+    const auto* output = down_cast<const StructColumn*>(result.value().get());
+    ASSERT_EQ(1, output->fields().size());
+    EXPECT_EQ("INCOMPLETE_VIOLATION_deviation_category", output->field_names()[0]);
+    EXPECT_NE(std::string::npos, output->fields()[0]->debug_item(0).find("INCOMPLETE"));
+}
+
+TEST_F(CelonisCreateAlignmentV2Test, IndividualIncompleteFieldsUseIndependentProjectionAndEdgeClasses) {
+    const VariantRows variants{{"B"}};
+    const auto all_fields_result =
+            execute(true, variants, create_alignment_output_projection::ALL_FIELDS_MASK,
+                    make_return_type(create_alignment_output_projection::ALL_FIELDS_MASK), GATEWAY_SEPARATED_MODEL);
+    ASSERT_OK(all_fields_result.status());
+
+    const auto* all_fields = down_cast<const StructColumn*>(all_fields_result.value().get());
+    ASSERT_EQ(create_alignment_output_projection::FIELD_COUNT, all_fields->fields().size());
+    for (size_t bit = create_alignment_output_projection::V1_FIELD_COUNT;
+         bit < create_alignment_output_projection::FIELD_COUNT; ++bit) {
+        const auto mask = std::uint64_t{1} << bit;
+        const auto projected_result = execute(true, variants, mask, make_return_type(mask), GATEWAY_SEPARATED_MODEL);
+        ASSERT_OK(projected_result.status());
+
+        const auto* projected = down_cast<const StructColumn*>(projected_result.value().get());
+        ASSERT_EQ(1, projected->fields().size());
+        ASSERT_EQ(1, projected->field_names().size());
+        EXPECT_EQ(std::string{create_alignment_output_projection::fields()[bit].name}, projected->field_names()[0]);
+        EXPECT_TRUE(projected->fields()[0]->equals(0, *all_fields->fields()[bit], 0)) << "bit=" << bit;
+        EXPECT_NE("[]", projected->fields()[0]->debug_item(0)) << "bit=" << bit;
+    }
+
+    constexpr size_t incomplete_edge_class_bit{create_alignment_output_projection::V1_FIELD_COUNT +
+                                               static_cast<size_t>(association_output_column::EDGE_CLASS)};
+    const auto incomplete_edge_classes = all_fields->fields()[incomplete_edge_class_bit]->debug_item(0);
+    EXPECT_NE("[]", incomplete_edge_classes);
+    EXPECT_EQ(std::string::npos, incomplete_edge_classes.find_first_not_of("[0,]"));
+
+    const auto missing_edge_class =
+            std::ranges::find(all_fields->field_names(), std::string{"MISSING_VIOLATION_edge_class"});
+    ASSERT_NE(all_fields->field_names().end(), missing_edge_class);
+    const auto missing_edge_class_bit = std::distance(all_fields->field_names().begin(), missing_edge_class);
+    EXPECT_NE(std::string::npos, all_fields->fields()[missing_edge_class_bit]->debug_item(0).find('1'));
 }
 
 TEST_F(CelonisCreateAlignmentV2Test, RepresentativeMasksMatchLegacy) {
@@ -173,8 +295,8 @@ TEST_F(CelonisCreateAlignmentV2Test, EmptyActivityArrayMatchesLegacy) {
     auto empty_array = ColumnHelper::create_column(celonis::array_type(TYPE_VARCHAR), true);
     empty_array->append_datum(DatumArray{});
     const auto legacy_result = execute_with_variant_column(
-            false, empty_array, 1, create_alignment_output_projection::ALL_FIELDS_MASK,
-            make_return_type(create_alignment_output_projection::ALL_FIELDS_MASK), PARALLEL_MODEL);
+            false, empty_array, 1, create_alignment_output_projection::ALL_FIELDS_V1_MASK,
+            make_return_type(create_alignment_output_projection::ALL_FIELDS_V1_MASK), PARALLEL_MODEL);
     const auto v2_result =
             execute_with_variant_column(true, std::move(empty_array), 1, 28, make_return_type(28), PARALLEL_MODEL);
     expect_results_match(28, 1, legacy_result, v2_result);
@@ -221,16 +343,32 @@ TEST_F(CelonisCreateAlignmentV2Test, ProjectedResultTableContainsOnlyRequestedFi
     EXPECT_FALSE(move_type_only.needs_deviation_categories());
 }
 
-TEST_F(CelonisCreateAlignmentV2Test, ExistingHelperDefaultRemainsFull) {
-    AlignModelHelper helper;
+TEST_F(CelonisCreateAlignmentV2Test, HelperDefaultProjectionMatchesVersion) {
     AlignModelHelper::traces_t traces{{std::string{"A"}, std::string{"C"}}};
-    ASSERT_OK(helper.execute(traces, PARALLEL_MODEL, AlignModelHelper::celostar_align_model_version::V2));
+    AlignModelHelper v2_helper;
+    ASSERT_OK(v2_helper.execute(traces, PARALLEL_MODEL, AlignModelHelper::celostar_align_model_version::V2));
 
-    const auto& columns = helper.result_table().columns();
-    EXPECT_EQ(create_alignment_output_projection::FIELD_COUNT + 1, columns.size());
-    EXPECT_TRUE(columns.contains("variant"));
+    const auto& v2_columns = v2_helper.result_table().columns();
+    EXPECT_EQ(create_alignment_output_projection::V1_FIELD_COUNT + 1, v2_columns.size());
+    EXPECT_TRUE(v2_columns.contains("variant"));
+    for (size_t bit = 0; bit < create_alignment_output_projection::V1_FIELD_COUNT; ++bit) {
+        const auto field_name = std::string{create_alignment_output_projection::fields()[bit].name};
+        EXPECT_TRUE(v2_columns.contains(field_name)) << field_name;
+    }
+    for (size_t bit = create_alignment_output_projection::V1_FIELD_COUNT;
+         bit < create_alignment_output_projection::FIELD_COUNT; ++bit) {
+        const auto field_name = std::string{create_alignment_output_projection::fields()[bit].name};
+        EXPECT_FALSE(v2_columns.contains(field_name)) << field_name;
+    }
+
+    AlignModelHelper v3_helper;
+    ASSERT_OK(v3_helper.execute(traces, PARALLEL_MODEL, AlignModelHelper::celostar_align_model_version::V3));
+
+    const auto& v3_columns = v3_helper.result_table().columns();
+    EXPECT_EQ(create_alignment_output_projection::FIELD_COUNT + 1, v3_columns.size());
+    EXPECT_TRUE(v3_columns.contains("variant"));
     for (const auto& field : create_alignment_output_projection::fields()) {
-        EXPECT_TRUE(columns.contains(std::string{field.name})) << field.name;
+        EXPECT_TRUE(v3_columns.contains(std::string{field.name})) << field.name;
     }
 }
 
@@ -270,7 +408,9 @@ TEST_F(CelonisCreateAlignmentV2Test, PrepareRejectsInvalidMaskColumns) {
 
     EXPECT_TRUE(prepare(ColumnHelper::create_const_column<TYPE_BIGINT>(0, 1), true).is_invalid_argument());
     EXPECT_TRUE(prepare(ColumnHelper::create_const_column<TYPE_BIGINT>(-1, 1), true).is_invalid_argument());
-    EXPECT_TRUE(prepare(ColumnHelper::create_const_column<TYPE_BIGINT>(std::int64_t{1} << 47, 1), true)
+    EXPECT_TRUE(prepare(ColumnHelper::create_const_column<TYPE_BIGINT>(
+                                std::int64_t{1} << create_alignment_output_projection::FIELD_COUNT, 1),
+                        true)
                         .is_invalid_argument());
     EXPECT_TRUE(prepare(ColumnHelper::create_const_null_column(1), true).is_invalid_argument());
     EXPECT_TRUE(prepare(ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_BIGINT), false), false)

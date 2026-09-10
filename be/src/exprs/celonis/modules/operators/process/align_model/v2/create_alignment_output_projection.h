@@ -49,14 +49,17 @@ struct create_alignment_output_field {
 
 class create_alignment_output_projection {
  public:
-  static constexpr size_t FIELD_COUNT{47};
+  static constexpr size_t V1_FIELD_COUNT{47};
+  static constexpr size_t FIELD_COUNT{V1_FIELD_COUNT + 6 /* association column field count*/};
   static constexpr std::uint64_t ALL_FIELDS_MASK{(std::uint64_t{1} << FIELD_COUNT) - 1};
+  static constexpr std::uint64_t ALL_FIELDS_V1_MASK{(std::uint64_t{1} << V1_FIELD_COUNT) - 1};
 
   [[nodiscard]] static starrocks::StatusOr<create_alignment_output_projection> from_mask_and_return_fields(
       std::int64_t mask, const std::vector<std::string>& return_fields);
 
   // Existing full-table callers require the internal variant column in addition to all public fields.
   [[nodiscard]] static create_alignment_output_projection all_fields();
+  [[nodiscard]] static create_alignment_output_projection all_fields_v1();
 
   [[nodiscard]] bool contains(alignment_output_column column) const;
   [[nodiscard]] bool contains(edge_type type, association_output_column column) const;

@@ -61,6 +61,12 @@ constexpr auto OUTPUT_FIELDS{std::to_array<create_alignment_output_field>({
     {"EXCLUSIVE_VIOLATION_deviation_category", value_type::STRING_ARRAY},
     {"EXCLUSIVE_VIOLATION_edge_class", value_type::ROW_ID_ARRAY},
     {"EXCLUSIVE_VIOLATION_alignment_index", value_type::ROW_ID_ARRAY},
+    {"INCOMPLETE_VIOLATION_model_vertex_id", value_type::OPTIONAL_MODEL_VERTEX_ID_ARRAY},
+    {"INCOMPLETE_VIOLATION_vertex_label", value_type::STRING_ARRAY},
+    {"INCOMPLETE_VIOLATION_move_type", value_type::STRING_ARRAY},
+    {"INCOMPLETE_VIOLATION_deviation_category", value_type::STRING_ARRAY},
+    {"INCOMPLETE_VIOLATION_edge_class", value_type::ROW_ID_ARRAY},
+    {"INCOMPLETE_VIOLATION_alignment_index", value_type::ROW_ID_ARRAY},
 })};
 
 constexpr size_t ALIGNMENT_FIELD_COUNT{static_cast<size_t>(alignment_output_column::FIELD_COUNT)};
@@ -110,10 +116,13 @@ starrocks::StatusOr<create_alignment_output_projection> create_alignment_output_
   return create_alignment_output_projection{unsigned_mask, false};
 }
 
+create_alignment_output_projection create_alignment_output_projection::all_fields_v1() {
+  return create_alignment_output_projection{ALL_FIELDS_V1_MASK, true};
+}
+
 create_alignment_output_projection create_alignment_output_projection::all_fields() {
   return create_alignment_output_projection{ALL_FIELDS_MASK, true};
 }
-
 bool create_alignment_output_projection::contains(alignment_output_column column) const {
   const auto bit{static_cast<size_t>(column)};
   return (mask_ & (std::uint64_t{1} << bit)) != 0;
@@ -149,7 +158,8 @@ bool create_alignment_output_projection::needs_vertex_labels() const {
 }
 
 bool create_alignment_output_projection::needs_deviation_categories() const {
-  if (contains(alignment_output_column::DEVIATION_CATEGORY)) {
+  if (contains(alignment_output_column::DEVIATION_CATEGORY) ||
+      any_field_for_edge_type(edge_type::L1_INCOMPLETE_VIOLATION)) {
     return true;
   }
   return std::ranges::any_of(

@@ -318,8 +318,9 @@ template <typename ACTIVITY_ACCESSOR>
   return variant_idx_to_log_idx;
 }
 
+template <compute_incomplete_category COMPUTE_V2 = compute_incomplete_category::NO>
 memory::table_group_t inflate(const alignments_t& full_alignments, const replay_results_t& replay_results,
-                              const deviation_categories_for_cases_view_t deviation_categories,
+                              const deviation_categories_for_cases_t& deviation_categories,
                               const memory::join_projection_vector_t& activity_to_case_join,
                               const memory::column_ptrs_t& case_to_trace_ptrs,
                               const bpmn::bpmn_to_string_t& bpmn_to_string, const memory::column_t& activity_column,
@@ -415,16 +416,41 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                       debug_assert(!deviation_categories_for_case->empty());
                     }
 
+                    // The predicate is utilized to determine if a certain component is supposed to be copied as
+                    // incomplete case. Any component that contains an INCOMPLETE deviation at the end is deemed
+                    // INCOMPLETE. INCOMPLETE violations only happen at the very end of a component, but GATEWAY moves
+                    // may still come afterwards without breaking this assumption.
+                    const auto is_incomplete{[](const auto& component, const auto& local_alignment_for_case,
+                                                const auto& dev_categories_for_case) -> bool {
+                      size_t idx{component.edges_as_vertices.size()};
+
+                      while (idx > 0 &&
+                             local_alignment_for_case.at(component.edges_as_vertices.at(--idx)).is_gateway_move()) {
+                      }
+                      return dev_categories_for_case.at(component.edges_as_vertices.at(idx)) ==
+                             deviation_category::INCOMPLETE;
+                    }};
+
                     // 1. Fill the edge tables
                     // A counter for the current edge class id. Each edge type has its own counter as it is saola.
-                    // Having separate counters for each type is not really necessary and a global counter is simpler to
-                    // implement, but for now I would like to keep the implementation changes minimal.
+
+                    // Having separate counters for each type is not really necessary and a global counter is
+                    // simpler to implement, but for now I would like to keep the implementation changes minimal.
                     if (output_projection.any_association_field()) {
-                      edge_type_array<size_t> edge_class_id{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
-                      edge_type_array<size_t> edges_per_type{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
+                      edge_type_array<size_t> edge_class_id{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
+                      edge_type_array<size_t> edges_per_type{0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul, 0ul};
                       for (const auto& component : replay_result_for_case.components()) {
                         if (output_projection.any_field_for_edge_type(component.component_type)) {
                           edges_per_type.at(component.component_type) += component.size();
+                        }
+                        if constexpr (COMPUTE_V2 == compute_incomplete_category::YES) {
+                          if (component.component_type == edge_type::L1_MISSING &&
+                              output_projection.any_field_for_edge_type(edge_type::L1_INCOMPLETE_VIOLATION)) {
+                            debug_assert(deviation_categories_for_case != nullptr);
+                            if (is_incomplete(component, alignment_for_case, *deviation_categories_for_case)) {
+                              edges_per_type.at(edge_type::L1_INCOMPLETE_VIOLATION) += component.size();
+                            }
+                          }
                         }
                       }
                       for (const auto type : EDGE_TYPES) {
@@ -452,50 +478,80 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
                           association_cols.deviation_category->at(current_variant_row).reserve(reserve_size);
                         }
                       }
+                      const auto populate_association_cols{
+                          [&](edge_type output_edge_type, auto& association_cols, const auto& component) {
+                            for (size_t vertex_id : component.edges_as_vertices) {
+                              if (association_cols.edge_class != nullptr) {
+                                association_cols.edge_class->at(current_variant_row)
+                                    .push_back(edge_class_id.at(output_edge_type));
+                              }
+                              if (association_cols.alignment_index != nullptr) {
+                                association_cols.alignment_index->at(current_variant_row)
+                                    .push_back(condensed_alignment_for_case.get_full_to_condensed_idx_map().left.at(
+                                        replay_result_for_case.alignment_to_preceding_move().at(vertex_id)));
+                              }
 
+                              const auto& move{alignment_for_case.at(vertex_id)};
+                              if (association_cols.model_vertex_id != nullptr) {
+                                if (move.move_on_model()) {
+                                  association_cols.model_vertex_id->at(current_variant_row)
+                                      .push_back(move.move_on_model().value());
+                                } else {
+                                  association_cols.model_vertex_id->at(current_variant_row).emplace_back();
+                                }
+                              }
+                              if (association_cols.vertex_label != nullptr) {
+                                debug_assert(petri_net_to_string_mapper.has_value());
+                                association_cols.vertex_label->at(current_variant_row)
+                                    .emplace_back(petri_net_to_string_mapper.value()(move));
+                              }
+                              if (association_cols.move_type != nullptr) {
+                                association_cols.move_type->at(current_variant_row)
+                                    .emplace_back(alignment_move_to_string(move.move_type()));
+                              }
+                              if (association_cols.deviation_category != nullptr) {
+                                debug_assert(deviation_categories_for_case != nullptr);
+                                association_cols.deviation_category->at(current_variant_row)
+                                    .emplace_back(
+                                        deviation_category_to_string(deviation_categories_for_case->at(vertex_id)));
+                              }
+                            }
+                          }};
                       for (const auto& component : replay_result_for_case.components()) {
-                        if (!output_projection.any_field_for_edge_type(component.component_type)) {
+                        const auto component_type{component.component_type};
+                        const auto component_fields_requested{
+                            output_projection.any_field_for_edge_type(component_type)};
+                        bool incomplete_fields_requested{false};
+                        if constexpr (COMPUTE_V2 == compute_incomplete_category::YES) {
+                          incomplete_fields_requested =
+                              component_type == edge_type::L1_MISSING &&
+                              output_projection.any_field_for_edge_type(edge_type::L1_INCOMPLETE_VIOLATION);
+                        }
+                        if (!component_fields_requested && !incomplete_fields_requested) {
                           continue;
                         }
-                        auto& association_cols{association_columns_per_edge_type.at(component.component_type).value()};
 
-                        for (size_t vertex_id : component.edges_as_vertices) {
-                          if (association_cols.edge_class != nullptr) {
-                            association_cols.edge_class->at(current_variant_row)
-                                .push_back(edge_class_id.at(component.component_type));
-                          }
-                          if (association_cols.alignment_index != nullptr) {
-                            association_cols.alignment_index->at(current_variant_row)
-                                .push_back(condensed_alignment_for_case.get_full_to_condensed_idx_map().left.at(
-                                    replay_result_for_case.alignment_to_preceding_move().at(vertex_id)));
-                          }
-
-                          const auto& move{alignment_for_case.at(vertex_id)};
-                          if (association_cols.model_vertex_id != nullptr) {
-                            if (move.move_on_model()) {
-                              association_cols.model_vertex_id->at(current_variant_row)
-                                  .push_back(move.move_on_model().value());
-                            } else {
-                              association_cols.model_vertex_id->at(current_variant_row).emplace_back();
-                            }
-                          }
-                          if (association_cols.vertex_label != nullptr) {
-                            debug_assert(petri_net_to_string_mapper.has_value());
-                            association_cols.vertex_label->at(current_variant_row)
-                                .emplace_back(petri_net_to_string_mapper.value()(move));
-                          }
-                          if (association_cols.move_type != nullptr) {
-                            association_cols.move_type->at(current_variant_row)
-                                .emplace_back(alignment_move_to_string(move.move_type()));
-                          }
-                          if (association_cols.deviation_category != nullptr) {
-                            debug_assert(deviation_categories_for_case != nullptr);
-                            association_cols.deviation_category->at(current_variant_row)
-                                .emplace_back(
-                                    deviation_category_to_string(deviation_categories_for_case->at(vertex_id)));
+                        if (component_fields_requested) {
+                          // Each component contains only a single edge type, fetch those columns.
+                          auto& association_cols{association_columns_per_edge_type.at(component_type).value()};
+                          populate_association_cols(component_type, association_cols, component);
+                          edge_class_id.at(component_type)++;
+                        }
+                        // INCOMPLETE is a specialization of MISSING. We still need to check if the trace contains any
+                        // INCOMPLETE activities.
+                        if constexpr (COMPUTE_V2 == compute_incomplete_category::YES) {
+                          if (incomplete_fields_requested &&
+                              is_incomplete(component, alignment_for_case, *deviation_categories_for_case)) {
+                            // An Incomplete component is fully duplicated on the INCOMPLETE edge. The copy does not
+                            // reclassify anything and the full component is the same as it is shown for the MISSING
+                            // violation.
+                            constexpr auto incomplete_type{edge_type::L1_INCOMPLETE_VIOLATION};
+                            populate_association_cols(incomplete_type,
+                                                      association_columns_per_edge_type.at(incomplete_type).value(),
+                                                      component);
+                            edge_class_id.at(incomplete_type)++;
                           }
                         }
-                        edge_class_id.at(component.component_type)++;
                       }
                     }
 
@@ -586,17 +642,31 @@ memory::table_group_t inflate(const alignments_t& full_alignments, const replay_
 
 }  // anonymous namespace
 
+template <compute_incomplete_category COMPUTE_V2 = compute_incomplete_category::NO>
 memory::table_group_t create_tables(const alignments_t& alignments, const replay_results_t& replay_results,
-                                    deviation_categories_for_cases_view_t deviation_categories,
+                                    const deviation_categories_for_cases_t& deviation_categories,
                                     const bpmn::bpmn_to_string_t& bpmn_to_string, const variants& variants,
                                     const memory::column_t& activity_column, const memory::column_t& case_id_column,
                                     const memory::join_projection_vector_t& activity_to_case_join,
                                     const common::execution_context& context, size_t grain_size,
                                     const create_alignment_output_projection& output_projection) {
   auto create_tables_context{context.create_sub_context("create_tables", {})};
-  return inflate(alignments, replay_results, deviation_categories, activity_to_case_join,
-                 variants->get_case_to_trace_col_ptrs().value(), bpmn_to_string, activity_column,
-                 case_id_column->get_column_pointers(context), grain_size, create_tables_context, output_projection);
+
+  return inflate<COMPUTE_V2>(alignments, replay_results, deviation_categories, activity_to_case_join,
+                             variants->get_case_to_trace_col_ptrs().value(), bpmn_to_string, activity_column,
+                             case_id_column->get_column_pointers(context), grain_size, create_tables_context,
+                             output_projection);
 }
+template memory::table_group_t create_tables<compute_incomplete_category::NO>(
+    const alignments_t&, const replay_results_t&, const deviation_categories_for_cases_t&,
+    const bpmn::bpmn_to_string_t&, const variants&, const memory::column_t&, const memory::column_t&,
+    const memory::join_projection_vector_t&, const common::execution_context&, size_t,
+    const create_alignment_output_projection&);
+
+template memory::table_group_t create_tables<compute_incomplete_category::YES>(
+    const alignments_t&, const replay_results_t&, const deviation_categories_for_cases_t&,
+    const bpmn::bpmn_to_string_t&, const variants&, const memory::column_t&, const memory::column_t&,
+    const memory::join_projection_vector_t&, const common::execution_context&, size_t,
+    const create_alignment_output_projection&);
 
 }  // namespace celonis::accelerator::operators::process::align_model::v2

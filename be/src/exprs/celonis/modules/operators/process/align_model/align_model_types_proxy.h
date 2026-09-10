@@ -15,7 +15,18 @@ enum class cs_edge_type : std::uint8_t {
   UNMAPPED,
   L1_MISSING,
   L1_EXCLUSIVE_VIOLATION,
+  L1_INCOMPLETE_VIOLATION,
   SIZE  // Not an actual edge type, exists to encode the size of the enum at compile time
+};
+
+constexpr std::array<cs_edge_type, ctl::enum_to_underlying_type(cs_edge_type::SIZE) - 1> CS_EDGE_TYPES_V1{
+    cs_edge_type::SYNC,
+    cs_edge_type::MODEL,
+    cs_edge_type::SKIP,
+    cs_edge_type::LOG,
+    cs_edge_type::UNMAPPED,
+    cs_edge_type::L1_MISSING,
+    cs_edge_type::L1_EXCLUSIVE_VIOLATION,
 };
 
 constexpr std::array<cs_edge_type, ctl::enum_to_underlying_type(cs_edge_type::SIZE)> CS_EDGE_TYPES{
@@ -25,7 +36,9 @@ constexpr std::array<cs_edge_type, ctl::enum_to_underlying_type(cs_edge_type::SI
     cs_edge_type::LOG,
     cs_edge_type::UNMAPPED,
     cs_edge_type::L1_MISSING,
-    cs_edge_type::L1_EXCLUSIVE_VIOLATION};
+    cs_edge_type::L1_EXCLUSIVE_VIOLATION,
+    cs_edge_type::L1_INCOMPLETE_VIOLATION,
+};
 
 [[nodiscard]] std::string_view cs_edge_type_to_string_v2(cs_edge_type type);
 

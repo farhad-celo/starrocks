@@ -2,6 +2,7 @@
 
 #include <fmt/format.h>
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <variant>
@@ -115,7 +116,7 @@ Status prepare_create_alignment(FunctionContext* context, FunctionContext::Funct
 
 Status CelonisCreateAlignment::create_alignment_prepare(FunctionContext* context,
                                                         FunctionContext::FunctionStateScope scope) {
-    return prepare_create_alignment(context, scope, create_alignment_output_projection::all_fields(),
+    return prepare_create_alignment(context, scope, create_alignment_output_projection::all_fields_v1(),
                                     "celonis_create_alignment");
 }
 
@@ -123,6 +124,16 @@ Status CelonisCreateAlignment::create_alignment_v2_prepare(FunctionContext* cont
                                                            FunctionContext::FunctionStateScope scope) {
     if (scope != FunctionContext::FRAGMENT_LOCAL) {
         return Status::OK();
+    }
+    if (context->get_num_args() == 2) {
+        ASSIGN_OR_RETURN(auto output_projection,
+                         create_alignment_output_projection::from_mask_and_return_fields(
+                                 static_cast<std::int64_t>(create_alignment_output_projection::ALL_FIELDS_MASK),
+                                 context->get_return_type().field_names));
+        return prepare_create_alignment(context, scope, std::move(output_projection), "celonis_create_alignment_v2");
+    }
+    if (context->get_num_args() != 3) {
+        return Status::InvalidArgument("celonis_create_alignment_v2() requires two or three parameters");
     }
     const auto* mask_type = context->get_arg_type(2);
     if (mask_type == nullptr || mask_type->type != TYPE_BIGINT) {
@@ -163,6 +174,9 @@ using result_column_source =
         std::variant<const celonis::ResultColumn<model_vertex_id_column>*, const celonis::ResultColumn<string_column>*,
                      const celonis::ResultColumn<row_id_column>*>;
 
+enum class create_alignment_version : bool { V1, V2 };
+
+template <create_alignment_version CREATE_ALIGNMENT_VERSION>
 StatusOr<ColumnPtr> create_alignment_impl(FunctionContext* context, const Columns& columns,
                                           std::string_view function_name) {
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
@@ -219,8 +233,13 @@ StatusOr<ColumnPtr> create_alignment_impl(FunctionContext* context, const Column
     DCHECK_EQ(row_to_case_index.size(), chunk_size);
 
     AlignModelHelper helper;
-    RETURN_IF_ERROR(helper.execute(deduped_cases, bpmn_model_description,
-                                   AlignModelHelper::celostar_align_model_version::V2, output_projection));
+    if constexpr (CREATE_ALIGNMENT_VERSION == create_alignment_version::V2) {
+        RETURN_IF_ERROR(helper.execute(deduped_cases, bpmn_model_description,
+                                       AlignModelHelper::celostar_align_model_version::V3, output_projection));
+    } else {
+        RETURN_IF_ERROR(helper.execute(deduped_cases, bpmn_model_description,
+                                       AlignModelHelper::celostar_align_model_version::V2, output_projection));
+    }
     const auto& result_table = helper.result_table();
 
     // TODO(m.dierschke) Consider writing directly into starrocks columns instead of using an intermediate format.
@@ -248,7 +267,6 @@ StatusOr<ColumnPtr> create_alignment_impl(FunctionContext* context, const Column
             break;
         }
     }
-
     for (auto index : row_to_case_index) {
         if (index < 0) {
             AddNulls(fields);
@@ -263,15 +281,21 @@ StatusOr<ColumnPtr> create_alignment_impl(FunctionContext* context, const Column
 
     return res;
 }
+template StatusOr<ColumnPtr> create_alignment_impl<create_alignment_version::V1>(FunctionContext* context,
+                                                                                 const Columns& columns,
+                                                                                 std::string_view function_name);
+template StatusOr<ColumnPtr> create_alignment_impl<create_alignment_version::V2>(FunctionContext* context,
+                                                                                 const Columns& columns,
+                                                                                 std::string_view function_name);
 
 } // namespace
 
 StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment(FunctionContext* context, const Columns& columns) {
-    return create_alignment_impl(context, columns, "celonis_create_alignment");
+    return create_alignment_impl<create_alignment_version::V1>(context, columns, "celonis_create_alignment");
 }
 
 StatusOr<ColumnPtr> CelonisCreateAlignment::create_alignment_v2(FunctionContext* context, const Columns& columns) {
-    return create_alignment_impl(context, columns, "celonis_create_alignment_v2");
+    return create_alignment_impl<create_alignment_version::V2>(context, columns, "celonis_create_alignment_v2");
 }
 
 } // namespace starrocks

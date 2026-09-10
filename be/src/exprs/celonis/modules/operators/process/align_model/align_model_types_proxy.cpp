@@ -24,6 +24,8 @@ edge_type constexpr to_saola(cs_edge_type type) {
       return edge_type::L1_MISSING;
     case cs_edge_type::L1_EXCLUSIVE_VIOLATION:
       return edge_type::L1_EXCLUSIVE_VIOLATION;
+    case cs_edge_type::L1_INCOMPLETE_VIOLATION:
+      return edge_type::L1_INCOMPLETE_VIOLATION;
     default:
       ctl::assert_unreachable();
   }

@@ -41,6 +41,8 @@ align_model_version to_saola_version(AlignModelHelper::celostar_align_model_vers
       return align_model_version::V1;
     case AlignModelHelper::celostar_align_model_version::V2:
       return align_model_version::V2;
+    case AlignModelHelper::celostar_align_model_version::V3:
+      return align_model_version::V3;
     default:
       ctl::assert_unreachable();
   }
@@ -79,7 +81,10 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces, const std::stri
 Status AlignModelHelper::execute(const traces_t& deduped_traces,
                                  const starrocks::celonis::bpmn_model_description& bpmn_model_description,
                                  celostar_align_model_version version) {
-  return execute(deduped_traces, bpmn_model_description, version, v2::create_alignment_output_projection::all_fields());
+  const auto output_projection = version == celostar_align_model_version::V3
+                                     ? v2::create_alignment_output_projection::all_fields()
+                                     : v2::create_alignment_output_projection::all_fields_v1();
+  return execute(deduped_traces, bpmn_model_description, version, output_projection);
 }
 
 Status AlignModelHelper::execute(const traces_t& deduped_traces,
@@ -88,7 +93,7 @@ Status AlignModelHelper::execute(const traces_t& deduped_traces,
                                  const v2::create_alignment_output_projection& output_projection) {
   auto settings{align_model_table_group_node_settings::builder{}.set_version(to_saola_version(version)).build()};
   const auto effective_output_projection = version == celostar_align_model_version::V1
-                                               ? v2::create_alignment_output_projection::all_fields()
+                                               ? v2::create_alignment_output_projection::all_fields_v1()
                                                : output_projection;
 
   // Convert variant_map and activity_map to Saola event_table, case_table and activity_to_case_join.

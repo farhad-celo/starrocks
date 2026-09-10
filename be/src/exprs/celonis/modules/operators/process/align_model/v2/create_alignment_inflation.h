@@ -53,8 +53,9 @@ namespace celonis::accelerator::operators::process::align_model::v2 {
  * @return memory::table_group_t The table group containing the alignment table, the association tables and the edge
  * class tables
  */
+template <compute_incomplete_category COMPUTE_V2>
 memory::table_group_t create_tables(const alignments_t& alignments, const replay_results_t& replay_results,
-                                    deviation_categories_for_cases_view_t deviation_categories,
+                                    const deviation_categories_for_cases_t& deviation_categories,
                                     const bpmn::bpmn_to_string_t& bpmn_to_string, const variants& variants,
                                     const memory::column_t& activity_column, const memory::column_t& case_id_column,
                                     const memory::join_projection_vector_t& activity_to_case_join,

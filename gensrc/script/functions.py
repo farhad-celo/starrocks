@@ -1438,6 +1438,8 @@ celostar_functions = [
     [1000603, 'celonis_create_alignment', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisCreateAlignment::create_alignment', 'CelonisCreateAlignment::create_alignment_prepare', 'CelonisCreateAlignment::create_alignment_close'],
     # The fields of STRUCT are set in FunctionAnalyzer.java in FE.
     [1000604, 'celonis_create_alignment_v2', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR', 'BIGINT'], 'CelonisCreateAlignment::create_alignment_v2', 'CelonisCreateAlignment::create_alignment_v2_prepare', 'CelonisCreateAlignment::create_alignment_close'],
+    # The fields of STRUCT are set in FunctionAnalyzer.java in FE.
+    [1000605, 'celonis_create_alignment_v2', True, False, 'ANY_STRUCT', ['ARRAY_VARCHAR', 'VARCHAR'], 'CelonisCreateAlignment::create_alignment_v2', 'CelonisCreateAlignment::create_alignment_v2_prepare', 'CelonisCreateAlignment::create_alignment_close'],
 
     [1000800, 'celonis_greatest', True, False, 'BIGINT', ['BIGINT', '...'], 'CelonisGreatestLeast::celonis_greatest'],
     [1000801, 'celonis_greatest', True, False, 'DOUBLE', ['DOUBLE', '...'], 'CelonisGreatestLeast::celonis_greatest'],

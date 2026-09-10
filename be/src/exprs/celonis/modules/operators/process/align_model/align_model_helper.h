@@ -20,7 +20,7 @@ class AlignModelHelper {
   using trace_t = std::vector<std::optional<activity_name_t>>;
   using traces_t = std::vector<trace_t>;
 
-  enum class celostar_align_model_version { V1, V2 };
+  enum class celostar_align_model_version { V1, V2, V3 };
 
   AlignModelHelper() = default;
 
