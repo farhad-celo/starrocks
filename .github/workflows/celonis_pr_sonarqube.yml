@@ -55,8 +55,8 @@ jobs:
   fe-coverage:
     runs-on: [runs-on, "runner=64cpu-linux-x64,volume=100g", "run-id=${{ github.run_id }}"]
     needs: setup
-    # SONAR_TOKEN_ENV is an Environment secret. PR runs require approval in
-    # sonar-pr; trusted manual runs use sonar-main.
+    # SONAR_TOKEN_ENV is a least-privilege analysis token. PR runs use the
+    # pull-request-only sonar-pr environment; trusted manual runs use sonar-main.
     environment:
       name: ${{ github.event_name == 'pull_request' && 'sonar-pr' || 'sonar-main' }}
     container:
@@ -179,8 +179,8 @@ jobs:
     name: be-sonarQube-scan
     runs-on: [runs-on, "runner=64cpu-linux-x64,volume=150g", "run-id=${{ github.run_id }}"]
     needs: setup
-    # SONAR_TOKEN_ENV is an Environment secret. PR runs require approval in
-    # sonar-pr; trusted manual runs use sonar-main.
+    # SONAR_TOKEN_ENV is a least-privilege analysis token. PR runs use the
+    # pull-request-only sonar-pr environment; trusted manual runs use sonar-main.
     environment:
       name: ${{ github.event_name == 'pull_request' && 'sonar-pr' || 'sonar-main' }}
     env:
