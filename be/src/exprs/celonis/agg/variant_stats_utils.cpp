@@ -240,15 +240,16 @@ VariantAnalysisResult analyze_variants_for_explore_process(const VariantHashMap&
         activity_top_variants[i].reserve(10);
     }
     std::vector<int8_t> a_done(activity_map.size(), 0);
+    // Track the last variant in which each activity was seen to avoid clearing an activity-sized bitmap per variant.
+    std::vector<size_t> a_last_seen(activity_map.size(), v_count.size());
     int done_count = 0;
     for (size_t i = 0; i < v_count.size(); i++) {
         // Check activities matched by this variant.
         const auto& variant = v_count[i]->first;
-        std::vector<int8_t> a_seen(activity_map.size(), 0);
         for (size_t j = 0; j < variant.data.size(); j++) {
             uint32_t idx = variant.data[j];
-            if (a_done[idx] == 0 && a_seen[idx] == 0) {
-                a_seen[idx] = 1;
+            if (a_done[idx] == 0 && a_last_seen[idx] != i) {
+                a_last_seen[idx] = i;
                 activity_top_variants[idx].push_back(v_count[i]);
                 if (activity_top_variants[idx].size() >= 10) {
                     a_done[idx] = 1;
