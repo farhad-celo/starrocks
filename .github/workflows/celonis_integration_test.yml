@@ -19,6 +19,7 @@ env:
 
 permissions:
   contents: write
+  id-token: write
   pull-requests: read
 
 jobs:
@@ -214,8 +215,6 @@ jobs:
         with:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${artifact_image_tag}
           image_tag: ${artifact_image_tag}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   celostar-presubmit-test:
     runs-on: [runs-on,runner=1cpu-linux-x64,image=ubuntu22-full-x64,"run-id=${{ github.run_id }}"]
@@ -269,8 +268,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.test_image_tag }}
           image_tag: ${{ env.image_tag }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       - name: Build FE & BE
         uses: ./.github/actions/build-fe-be
         with:

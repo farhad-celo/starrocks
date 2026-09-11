@@ -28,6 +28,7 @@ env:
 
 permissions:
   contents: write
+  id-token: write
   pull-requests: write
 
 concurrency:
@@ -284,11 +285,10 @@ jobs:
           arm_image_tag: ghcr.io/celonis/celostar/starrocks-fe:${{ env.ARM_IMAGE_TAG }}
           x86_image_tag: ghcr.io/celonis/celostar/starrocks-fe:${{ env.X86_IMAGE_TAG }}
           mul_arch_image_tag: ghcr.io/celonis/celostar/starrocks-fe:${{ env.RELEASE_IMAGE_TAG }}
-      - name: Configure prod AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Authenticate to AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::652406827250:role/github-actions-org-oidc
           aws-region: eu-central-1
       - name: prod Amazon ECR login
         id: login-ecr

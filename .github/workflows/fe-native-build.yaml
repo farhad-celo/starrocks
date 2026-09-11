@@ -50,6 +50,11 @@ env:
   GITHUB_USERNAME: ${{ github.repository }}
 
 run-name: Build FE ${{ inputs.component-name }} - ${{ inputs.version }}
+
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   build-ubuntu:
     name: Ubuntu Release FE (${{ matrix.image_suffix }})
@@ -98,8 +103,6 @@ jobs:
           oci_version: ${{ inputs.celostar-docker-tag && format('{0}-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           branch: ${{ inputs.branch }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   build-debian12:
     name: Debian 12 FE (${{ matrix.image_suffix }})
@@ -134,8 +137,6 @@ jobs:
           oci_version: ${{ inputs.celostar-docker-tag && format('{0}-debian12-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           branch: ${{ inputs.branch }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           fe_dockerfile: 'docker/dockerfiles/fe/fe-debian12.Dockerfile'
 
   build-asan:
@@ -179,8 +180,6 @@ jobs:
           oci_version: ${{ inputs.celostar-docker-tag && format('{0}-asan-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           branch: ${{ inputs.branch }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   build-and-push-manifest:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
@@ -198,8 +197,6 @@ jobs:
           publish_be: 'false'
           publish_fe: 'true'
           publish_allin1: 'false'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           celostar_docker_tag: ${{ inputs.celostar-docker-tag }}
 
   build-and-push-debian12-manifest:
@@ -218,8 +215,6 @@ jobs:
           publish_be: 'false'
           publish_fe: 'true'
           publish_allin1: 'false'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           celostar_docker_tag: ${{ inputs.celostar-docker-tag && format('{0}-debian12', inputs.celostar-docker-tag) || '' }}
 
   build-and-push-asan-manifest:
@@ -238,6 +233,4 @@ jobs:
           publish_be: 'false'
           publish_fe: 'true'
           publish_allin1: 'false'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           celostar_docker_tag: ${{ inputs.celostar-docker-tag && format('{0}-asan', inputs.celostar-docker-tag) || '' }}

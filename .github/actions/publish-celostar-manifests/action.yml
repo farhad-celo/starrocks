@@ -20,12 +20,6 @@ inputs:
       Generated upstream (repodepot-custom-image) and passed through the native build workflows.
     required: false
     default: ''
-  aws_access_key_id:
-    description: AWS access key ID
-    required: true
-  aws_secret_access_key:
-    description: AWS secret access key
-    required: true
   publish_be:
     description: Publish starrocks-be multi-arch manifests (ECR + GHCR).
     required: false
@@ -46,11 +40,10 @@ runs:
       shell: bash
       run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_USERNAME}" --password-stdin
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
+    - name: Authenticate to AWS (OIDC)
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
       with:
-        aws-access-key-id: ${{ inputs.aws_access_key_id }}
-        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        role-to-assume: arn:aws:iam::652406827250:role/github-actions-org-oidc
         aws-region: eu-central-1
 
     - name: Amazon ECR login

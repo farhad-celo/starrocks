@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
   # Needed for the 'trilom/file-changes-action' action
   pull-requests: read
 
@@ -55,8 +56,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.RANDOM_TAG }}
           image_tag: ${{ env.RANDOM_TAG }}
           pull_artifact: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build and push fe-be
         uses: ./.github/actions/build-fe-be
@@ -64,8 +63,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.RANDOM_TAG }}
           image_tag: ${{ env.RANDOM_TAG }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
 
   celostar-compliance-test:

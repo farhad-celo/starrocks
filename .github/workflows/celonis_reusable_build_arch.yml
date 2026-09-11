@@ -36,6 +36,10 @@ on:
       allin1_image:
         value: ${{ jobs.build.outputs.allin1_image }}
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   build:
     runs-on: ${{ fromJSON(inputs.runs_on_json) }}
@@ -73,8 +77,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           pull_artifact: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build and push fe-be (release)
         if: inputs.variant == 'release'
@@ -83,8 +85,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build allin1 image (asan)
         if: inputs.variant == 'asan'
@@ -93,5 +93,3 @@ jobs:
           artifact_image: starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           pull_artifact: 'false'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

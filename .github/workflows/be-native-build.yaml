@@ -50,6 +50,11 @@ env:
   GITHUB_USERNAME: ${{ github.repository }}
 
 run-name: Build ${{ inputs.component-name }} - ${{ inputs.version }}
+
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   # Ubuntu Release per arch (tags: {image-tag}-arm / {image-tag}-x86), same pattern as celonis_release build-arm / build-x86
   build-ubuntu:
@@ -99,8 +104,6 @@ jobs:
           oci_version: ${{ inputs.celostar-docker-tag && format('{0}-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           pull_artifact: 'false'
           for_dic: ${{ inputs.for_dic }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build and push BE image
         uses: ./.github/actions/build-be
@@ -110,8 +113,6 @@ jobs:
           oci_version: ${{ inputs.celostar-docker-tag && format('{0}-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           branch: ${{ inputs.branch }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   # Debian 12 runtime images reuse the Ubuntu-built artifacts (celonis_release build-debian12-*)
   build-debian12:
@@ -147,8 +148,6 @@ jobs:
           oci_version: ${{ inputs.celostar-docker-tag && format('{0}-debian12-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           pull_artifact: 'true'
           for_dic: ${{ inputs.for_dic }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           allin1_dockerfile: 'docker/dockerfiles/allin1/allin1-debian12.Dockerfile'
 
       - name: Build and push BE image (Debian12)
@@ -159,8 +158,6 @@ jobs:
           oci_version: ${{ inputs.celostar-docker-tag && format('{0}-debian12-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           branch: ${{ inputs.branch }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           be_dockerfile: 'docker/dockerfiles/be/be-debian12.Dockerfile'
 
   # ASAN builds (celonis_release build-asan-arm / build-asan-x86) — ubuntu22 images for sanitizer toolchain compatibility
@@ -205,8 +202,6 @@ jobs:
           oci_version: ${{ inputs.celostar-docker-tag && format('{0}-asan-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           pull_artifact: 'false'
           for_dic: ${{ inputs.for_dic }}
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build and push ASAN BE image
         uses: ./.github/actions/build-be
@@ -216,8 +211,6 @@ jobs:
           oci_version: ${{ inputs.celostar-docker-tag && format('{0}-asan-{1}', inputs.celostar-docker-tag, matrix.oci_suffix) || '' }}
           branch: ${{ inputs.branch }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   build-and-push-manifest:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
@@ -235,8 +228,6 @@ jobs:
           publish_be: 'true'
           publish_fe: 'false'
           publish_allin1: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           celostar_docker_tag: ${{ inputs.celostar-docker-tag }}
 
   build-and-push-debian12-manifest:
@@ -255,8 +246,6 @@ jobs:
           publish_be: 'true'
           publish_fe: 'false'
           publish_allin1: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           celostar_docker_tag: ${{ inputs.celostar-docker-tag && format('{0}-debian12', inputs.celostar-docker-tag) || '' }}
 
   build-and-push-asan-manifest:
@@ -275,6 +264,4 @@ jobs:
           publish_be: 'true'
           publish_fe: 'false'
           publish_allin1: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           celostar_docker_tag: ${{ inputs.celostar-docker-tag && format('{0}-asan', inputs.celostar-docker-tag) || '' }}

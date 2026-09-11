@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
   # Needed for the 'trilom/file-changes-action' action
   pull-requests: read
 
@@ -57,8 +58,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           pull_artifact: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build and push fe-be
         uses: ./.github/actions/build-fe-be
@@ -66,8 +65,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   build-x86:
     runs-on: [ runs-on, runner=64cpu-linux-x64, image=ubuntu24-full-x64, disk=large, "run-id=${{ github.run_id }}" ]
@@ -94,8 +91,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           pull_artifact: 'false'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build and push fe-be
         uses: ./.github/actions/build-fe-be
@@ -103,8 +98,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           to_push: 'true'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   build-and-push-manifest:
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
@@ -126,11 +119,10 @@ jobs:
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
 
-      - name: Configure prod AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Authenticate to AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::652406827250:role/github-actions-org-oidc
           aws-region: eu-central-1
 
       - name: prod Amazon ECR login
@@ -212,8 +204,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           pull_artifact: 'false'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build and push ASAN FE & BE images for ARM
         uses: ./.github/actions/build-fe-be
@@ -221,8 +211,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           to_push: true
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   build-asan-x86:
     runs-on: [ runs-on, runner=64cpu-linux-x64, image=ubuntu22-full-x64, disk=large, "run-id=${{ github.run_id }}" ]
@@ -253,8 +241,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           pull_artifact: 'false'
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Build and push ASAN FE & BE images for X86
         uses: ./.github/actions/build-fe-be
@@ -262,8 +248,6 @@ jobs:
           artifact_image: ghcr.io/celonis/celostar/starrocks-artifacts:${{ env.image_tag }}
           image_tag: ${{ env.image_tag }}
           to_push: true
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   build-and-push-asan-manifest:
     runs-on: [ runs-on, runner=1cpu-linux-x64, "run-id=${{ github.run_id }}" ]
@@ -285,11 +269,10 @@ jobs:
         run: |
           echo ${GITHUB_TOKEN} | docker login ghcr.io -u ${GITHUB_USERNAME} --password-stdin
 
-      - name: Configure prod AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Authenticate to AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::652406827250:role/github-actions-org-oidc
           aws-region: eu-central-1
 
       - name: prod Amazon ECR login

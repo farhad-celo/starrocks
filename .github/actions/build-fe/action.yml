@@ -15,12 +15,6 @@ inputs:
     required: false
     default: 'true'
     description: "whether to push the images to remote"
-  aws_access_key_id:
-    required: false
-    description: "aws access key id"
-  aws_secret_access_key:
-    required: false
-    description: "aws access key"
   fe_dockerfile:
     required: false
     default: 'docker/dockerfiles/fe/fe-ubuntu.Dockerfile'
@@ -33,12 +27,11 @@ runs:
       shell: bash
       run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_USERNAME}" --password-stdin
 
-    - name: Configure AWS credentials
+    - name: Authenticate to AWS (OIDC)
       if: ${{ inputs.to_push == 'true' }}
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
       with:
-        aws-access-key-id: ${{ inputs.aws_access_key_id }}
-        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        role-to-assume: arn:aws:iam::652406827250:role/github-actions-org-oidc
         aws-region: eu-central-1
 
     - name: Login to Amazon ECR
