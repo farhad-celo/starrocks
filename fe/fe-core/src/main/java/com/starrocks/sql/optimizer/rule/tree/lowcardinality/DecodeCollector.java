@@ -199,8 +199,15 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
 
     // Array functions that accept more than one non-constant columns. These columns should always be processed
     // independently. Any child that needs a rewrite should be saved in StringExpressions separately.
-    public static final Set<String> LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS = ImmutableSet.of(
+    public static final Set<String> LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS = Sets.newHashSet(
             FunctionSet.ARRAY_FILTER, FunctionSet.ARRAY_SORTBY, FunctionSet.ARRAY_MAP);
+
+    public static final Set<String> CELONIS_LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS = ImmutableSet.of(
+            FunctionSet.CELONIS_DEDUP_SORTED_BY);
+
+    static {
+        LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS.addAll(CELONIS_LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS);
+    }
 
     public static final Set<String> CELONIS_LOW_CARD_ARRAY_FUNCTIONS = ImmutableSet.of(
             FunctionSet.CELONIS_ARRAY_COUNT, FunctionSet.CELONIS_SHORTENED_VARIANT, FunctionSet.CELONIS_ARRAY_FIRST,
@@ -1654,6 +1661,10 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                     || FunctionSet.CELONIS_CALC_CROP_TO_NULL.equals(call.getFnName()))
                     && !sessionVariable.isEnableCalcCropLowCardinalityOptimize()) {
                 // TODO(farhad-celo): For backward compatibility. It can be removed after 1 release.
+                return forbidden(visitChildren(call, context), call);
+            }
+            if (FunctionSet.CELONIS_DEDUP_SORTED_BY.equals(call.getFnName())
+                    && !sessionVariable.isEnableDedupSortedByLowCardinalityOptimize()) {
                 return forbidden(visitChildren(call, context), call);
             }
 

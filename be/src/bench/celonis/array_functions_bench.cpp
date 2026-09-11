@@ -13,52 +13,56 @@
 namespace starrocks {
 
 /*
-2025-03-27T11:38:31+00:00
-Running ./be/build_Release/src/bench/celonis/output/array_functions_bench
-Run on (32 X 2445.43 MHz CPU s)
-CPU Caches:
-  L1 Data 32 KiB (x16)
-  L1 Instruction 32 KiB (x16)
-  L2 Unified 512 KiB (x16)
-  L3 Unified 32768 KiB (x2)
-Load Average: 5.91, 4.39, 4.18
-----------------------------------------------------------------------------------------------
-Benchmark                                    Time             CPU   Iterations UserCounters...
-----------------------------------------------------------------------------------------------
-// Args: Number of rows / Number of unique elements in the array / Max number of duplicates per unique element
-BM_DedupSortedByVARCHAR/10000/10/5     2454653 ns      2454393 ns          290 RowInvRate=245.439ns
-BM_DedupSortedByVARCHAR/10000/20/5     6276774 ns      6276287 ns          111 RowInvRate=627.629ns
-BM_DedupSortedByVARCHAR/10000/10/10    4327619 ns      4327285 ns          162 RowInvRate=432.729ns
-BM_DedupSortedByVARCHAR/10000/20/10    9201218 ns      9199696 ns           76 RowInvRate=919.97ns
-// Args: Number of rows / True percentage / Array length
-BM_ArrayBoolOr/1000/1/10                 13628 ns        13580 ns        49883 RowInvRate=13.5805ns
-BM_ArrayBoolOr/10000/1/10               124194 ns       124100 ns         5695 RowInvRate=12.41ns
-BM_ArrayBoolOr/1000/10/10                18644 ns        18580 ns        38142 RowInvRate=18.5795ns
-BM_ArrayBoolOr/10000/10/10              173107 ns       173010 ns         4045 RowInvRate=17.301ns
-BM_ArrayBoolOr/1000/50/10                18697 ns        18648 ns        37477 RowInvRate=18.6479ns
-BM_ArrayBoolOr/10000/50/10              176191 ns       176111 ns         3991 RowInvRate=17.6111ns
-BM_ArrayBoolOr/1000/1/20                 17421 ns        17381 ns        39864 RowInvRate=17.3808ns
-BM_ArrayBoolOr/10000/1/20               169161 ns       169065 ns         4163 RowInvRate=16.9065ns
-BM_ArrayBoolOr/1000/10/20                21748 ns        21701 ns        32194 RowInvRate=21.7013ns
-BM_ArrayBoolOr/10000/10/20              204236 ns       204142 ns         3430 RowInvRate=20.4142ns
-BM_ArrayBoolOr/1000/50/20                18872 ns        18824 ns        37167 RowInvRate=18.8237ns
-BM_ArrayBoolOr/10000/50/20              176469 ns       176399 ns         3967 RowInvRate=17.6399ns
-// Args: Number of rows / Null percentage / Array length
-BM_ArrayCountVarchar/1000/0/20            7862 ns         7734 ns        90380 RowInvRate=7.73351ns
-BM_ArrayCountVarchar/10000/0/20          54991 ns        54876 ns        12712 RowInvRate=5.48764ns
-BM_ArrayCountVarchar/1000/10/20          11769 ns        11665 ns        59731 RowInvRate=11.6649ns
-BM_ArrayCountVarchar/10000/10/20         93428 ns        93320 ns         7515 RowInvRate=9.33205ns
-BM_ArrayCountVarchar/1000/50/20          11860 ns        11769 ns        59012 RowInvRate=11.7691ns
-BM_ArrayCountVarchar/10000/50/20         93447 ns        93338 ns         7456 RowInvRate=9.33384ns
-BM_ArrayCountVarchar/1000/0/100           7993 ns         7844 ns        89847 RowInvRate=7.84388ns
-BM_ArrayCountVarchar/10000/0/100         93222 ns        92988 ns         7577 RowInvRate=9.29879ns
-BM_ArrayCountVarchar/1000/10/100         29251 ns        29134 ns        23915 RowInvRate=29.1336ns
-BM_ArrayCountVarchar/10000/10/100       298464 ns       298247 ns         2361 RowInvRate=29.8247ns
-BM_ArrayCountVarchar/1000/50/100         29501 ns        29348 ns        23776 RowInvRate=29.3479ns
-BM_ArrayCountVarchar/10000/50/100       271210 ns       271083 ns         2603 RowInvRate=27.1083ns
+2026-09-10T20:49:15+00:00                                                                                                                                                                                        
+Running ./be/build_Release/src/bench/celonis/output/array_functions_bench                                                                                                                                        
+Run on (32 X 3111.34 MHz CPU s)                                                                                                                                                                                  
+CPU Caches:                                                                                                                                                                                                      
+  L1 Data 32 KiB (x16)                                                                                                                                                                                           
+  L1 Instruction 32 KiB (x16)                                                                                                                                                                                    
+  L2 Unified 1024 KiB (x16)                                                                                                                                                                                      
+  L3 Unified 33792 KiB (x1)                                                                                                                                                                                      
+Load Average: 1.00, 5.44, 14.11                                                                                                                                                                                  
+----------------------------------------------------------------------------------------------                                                                                                                   
+Benchmark                                    Time             CPU   Iterations UserCounters...                                                                                                                   
+----------------------------------------------------------------------------------------------                                                                                                                   
+BM_DedupSortedByVARCHAR/10000/10/5     4438195 ns      4437790 ns          175 RowInvRate=443.779ns                                                                                                              
+BM_DedupSortedByVARCHAR/10000/20/5    14535057 ns     14533813 ns           48 RowInvRate=1.45338us
+BM_DedupSortedByVARCHAR/10000/10/10   11008668 ns     11007665 ns           63 RowInvRate=1.10077us
+BM_DedupSortedByVARCHAR/10000/20/10   24666441 ns     24666067 ns           28 RowInvRate=2.46661us
+BM_DedupSortedByINT/10000/10/5         1645008 ns      1644450 ns          426 RowInvRate=164.445ns
+BM_DedupSortedByINT/10000/20/5         4279992 ns      4279077 ns          160 RowInvRate=427.908ns
+BM_DedupSortedByINT/10000/10/10        2127412 ns      2126792 ns          323 RowInvRate=212.679ns
+BM_DedupSortedByINT/10000/20/10        6188531 ns      6187523 ns          113 RowInvRate=618.752ns
+BM_ArrayBoolOr/1000/1/10                 12674 ns        12578 ns        55708 RowInvRate=12.5784ns
+BM_ArrayBoolOr/10000/1/10               111571 ns       111358 ns         6299 RowInvRate=11.1358ns
+BM_ArrayBoolOr/1000/10/10                18342 ns        18264 ns        38367 RowInvRate=18.2635ns
+BM_ArrayBoolOr/10000/10/10              167723 ns       167531 ns         4194 RowInvRate=16.7531ns
+BM_ArrayBoolOr/1000/50/10                18229 ns        18140 ns        38770 RowInvRate=18.1404ns
+BM_ArrayBoolOr/10000/50/10              166351 ns       166152 ns         4221 RowInvRate=16.6152ns
+BM_ArrayBoolOr/1000/1/20                 17476 ns        17362 ns        40344 RowInvRate=17.3622ns
+BM_ArrayBoolOr/10000/1/20               157288 ns       156942 ns         4471 RowInvRate=15.6942ns
+BM_ArrayBoolOr/1000/10/20                23079 ns        22976 ns        30458 RowInvRate=22.9763ns
+BM_ArrayBoolOr/10000/10/20              213811 ns       213423 ns         3286 RowInvRate=21.3423ns
+BM_ArrayBoolOr/1000/50/20                18312 ns        18194 ns        38486 RowInvRate=18.1939ns
+BM_ArrayBoolOr/10000/50/20              166294 ns       165975 ns         4218 RowInvRate=16.5975ns
+BM_ArrayCountVarchar/1000/0/20            9628 ns         9512 ns        73619 RowInvRate=9.51246ns
+BM_ArrayCountVarchar/10000/0/20          75559 ns        74925 ns         9388 RowInvRate=7.49246ns
+BM_ArrayCountVarchar/1000/10/20          17491 ns        17343 ns        40128 RowInvRate=17.3427ns
+BM_ArrayCountVarchar/10000/10/20        147212 ns       146544 ns         4793 RowInvRate=14.6544ns
+BM_ArrayCountVarchar/1000/50/20          18118 ns        17949 ns        39509 RowInvRate=17.949ns
+BM_ArrayCountVarchar/10000/50/20        146871 ns       146238 ns         4670 RowInvRate=14.6238ns
+BM_ArrayCountVarchar/1000/0/100          11725 ns        11294 ns        61840 RowInvRate=11.2935ns
+BM_ArrayCountVarchar/10000/0/100        458850 ns       457389 ns         1561 RowInvRate=45.7389ns
+BM_ArrayCountVarchar/1000/10/100         35099 ns        34645 ns        20126 RowInvRate=34.6451ns
+BM_ArrayCountVarchar/10000/10/100       651415 ns       650497 ns         1062 RowInvRate=65.0497ns
+BM_ArrayCountVarchar/1000/50/100         35298 ns        34784 ns        20032 RowInvRate=34.7841ns
+BM_ArrayCountVarchar/10000/50/100       322519 ns       321275 ns         2175 RowInvRate=32.1275ns
 */
 
-static void BM_DedupSortedByVARCHAR(benchmark::State& state) {
+// KeyType is the element type of key_array: TYPE_VARCHAR for the decoded strings and TYPE_INT for the global
+// dictionary codes the dictified plan passes instead.
+template <LogicalType KeyType>
+static void BM_DedupSortedBy(benchmark::State& state) {
     int num_rows = state.range(0);
     int num_unique_elements = state.range(1);
     int max_duplicates = state.range(2);
@@ -76,26 +80,28 @@ static void BM_DedupSortedByVARCHAR(benchmark::State& state) {
         values.push_back("value" + std::to_string(i));
     }
 
-    std::vector<FunctionContext::TypeDesc> arg_types = {
-            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)),
-            TypeDescriptor::create_array_type(TypeDescriptor(TYPE_DATETIME))};
-    auto return_type = TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR));
+    const auto input_array_type = TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR));
+    const auto key_array_type = TypeDescriptor::create_array_type(TypeDescriptor(KeyType));
 
     int total_rows = 0;
     for (auto _ : state) {
         state.PauseTiming();
         total_rows += num_rows;
-        auto input_column =
-                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), true);
-        auto key_column =
-                ColumnHelper::create_column(TypeDescriptor::create_array_type(TypeDescriptor(TYPE_VARCHAR)), true);
+        auto input_column = ColumnHelper::create_column(input_array_type, true);
+        auto key_column = ColumnHelper::create_column(key_array_type, true);
         for (int i = 0; i < num_rows; i++) {
             DatumArray input_array;
             DatumArray key_array;
             for (int j = 0; j < num_unique_elements; j++) {
                 Slice input = values[uniform_value(rng)];
                 // To be strict, we need to generate a key different from the previous one. But it wouldn't matter much.
-                Slice key = values[uniform_value(rng)];
+                int32_t key_index = uniform_value(rng);
+                Datum key;
+                if constexpr (KeyType == TYPE_VARCHAR) {
+                    key = Datum(Slice(values[key_index]));
+                } else {
+                    key = Datum(key_index);
+                }
                 int num_duplicates = uniform_duplicates(rng);
                 for (int k = 0; k < num_duplicates; k++) {
                     input_array.emplace_back(input);
@@ -107,11 +113,19 @@ static void BM_DedupSortedByVARCHAR(benchmark::State& state) {
         }
 
         state.ResumeTiming();
-        auto result = CelonisDedupSortedBy::process({input_column, key_column});
+        auto result = CelonisDedupSortedBy<KeyType>::process({input_column, key_column});
         ASSERT_TRUE(result.ok()) << result.status().message();
     }
     state.counters["RowInvRate"] =
             benchmark::Counter(total_rows, benchmark::Counter::kIsRate | benchmark::Counter::kInvert);
+}
+
+static void BM_DedupSortedByVARCHAR(benchmark::State& state) {
+    BM_DedupSortedBy<TYPE_VARCHAR>(state);
+}
+
+static void BM_DedupSortedByINT(benchmark::State& state) {
+    BM_DedupSortedBy<TYPE_INT>(state);
 }
 
 static void BM_ArrayBoolOr(benchmark::State& state) {
@@ -200,6 +214,7 @@ static void BM_ArrayCountVarchar(benchmark::State& state) {
 
 // Args: Number of rows / Number of unique elements in the array / Max number of duplicates per unique element
 BENCHMARK(BM_DedupSortedByVARCHAR)->ArgsProduct({{10000}, {10, 20}, {5, 10}});
+BENCHMARK(BM_DedupSortedByINT)->ArgsProduct({{10000}, {10, 20}, {5, 10}});
 
 // Args: Number of rows / True percentage / Array length
 BENCHMARK(BM_ArrayBoolOr)->ArgsProduct({{1000, 10000}, {1, 10, 50}, {10, 20}});

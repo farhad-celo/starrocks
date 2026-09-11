@@ -40,7 +40,8 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_int) {
         key_array->append_datum(DatumArray{"e1", "e2", "e3", "e4"});
         key_array->append_datum(DatumArray{"e1", "e1", "e2", "e2", "e2", "e3", "e3"});
 
-        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        const auto result =
+                CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
         ASSERT_EQ(2, result->size());
         ASSERT_EQ(4, result->get(0).get_array().size());
         EXPECT_EQ(1, result->get(0).get_array()[0].get_int32());
@@ -60,7 +61,8 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_int) {
         auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
         key_array->append_datum(DatumArray{"e1", "e1", "e2", "e2", "e2", "e3", "e3"});
 
-        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        const auto result =
+                CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
         ASSERT_EQ(1, result->size());
         ASSERT_EQ(3, result->get(0).get_array().size());
         EXPECT_EQ(10, result->get(0).get_array()[0].get_int32());
@@ -76,7 +78,7 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_varchar) {
     auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
     key_array->append_datum(DatumArray{"one", "two", "two", "three", "three", "three"});
 
-    const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+    const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
     ASSERT_EQ(1, result->size());
     ASSERT_EQ(3, result->get(0).get_array().size());
     EXPECT_EQ("10", result->get(0).get_array()[0].get_slice());
@@ -94,7 +96,7 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_datetime) {
     auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
     key_array->append_datum(DatumArray{"e1", "e2", "e3", "e3", "e3"});
 
-    const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+    const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
     ASSERT_EQ(1, result->size());
     ASSERT_EQ(3, result->get(0).get_array().size());
     EXPECT_EQ(TimestampValue::create(2017, 10, 1, 1, 32, 32), result->get(0).get_array()[0].get_timestamp());
@@ -113,7 +115,8 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_array) {
         key_array->append_datum(DatumArray{"e1", "e2"});
         key_array->append_datum(DatumArray{"e1", "e2", "e2", "e4"});
 
-        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        const auto result =
+                CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
         ASSERT_EQ(2, result->size());
         ASSERT_TRUE(result->is_null(0));
         ASSERT_EQ(3, result->get(1).get_array().size());
@@ -131,7 +134,8 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_array) {
         key_array->append_datum(DatumArray{});
         key_array->append_datum(DatumArray{"e1", "e2", "e2", "e4"});
 
-        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        const auto result =
+                CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
         ASSERT_EQ(2, result->size());
         ASSERT_TRUE(result->is_null(0));
         ASSERT_EQ(3, result->get(1).get_array().size());
@@ -149,7 +153,8 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_array) {
         key_array->append_datum(DatumArray{"e1", "e2", "e3", "e4"});
         key_array->append_datum(Datum{});
 
-        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        const auto result =
+                CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
         ASSERT_EQ(2, result->size());
         ASSERT_EQ(4, result->get(0).get_array().size());
         EXPECT_EQ(1, result->get(0).get_array()[0].get_int32());
@@ -168,7 +173,8 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_array) {
         key_array->append_datum(DatumArray{"e1", "e2", "e3", "e4"});
         key_array->append_datum(Datum{});
 
-        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        const auto result =
+                CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
         ASSERT_EQ(2, result->size());
         ASSERT_EQ(4, result->get(0).get_array().size());
         EXPECT_EQ(1, result->get(0).get_array()[0].get_int32());
@@ -187,7 +193,7 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_array) {
         key_array->append_datum(DatumArray{"e1", "e2", "e3", "e4"});
         key_array->append_datum(Datum{});
 
-        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array});
+        const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array});
         ASSERT_TRUE(result.status().is_invalid_argument());
         EXPECT_EQ(result.status().message(), "The size of input_array and key_array should not be different.");
     }
@@ -202,7 +208,7 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_empty_input_array) {
     key_array->append_datum(DatumArray{"e1", "e2", "e3", "e4"});
     key_array->append_datum(DatumArray{});
 
-    const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+    const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
     ASSERT_EQ(2, result->size());
     ASSERT_EQ(4, result->get(0).get_array().size());
     EXPECT_EQ(1, result->get(0).get_array()[0].get_int32());
@@ -220,7 +226,7 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_null_elements) {
     auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
     key_array->append_datum(DatumArray{Datum{}, "e1", "e2", "e2"});
 
-    const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array});
+    const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array});
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "key_array should not have null elements.");
 }
@@ -232,7 +238,7 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_array_size_mismatch) {
     auto key_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
     key_array->append_datum(DatumArray{"e1", "e2", "e2"});
 
-    const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array});
+    const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array});
     ASSERT_TRUE(result.status().is_invalid_argument());
     EXPECT_EQ(result.status().message(), "The size of input_array and key_array should not be different.");
 }
@@ -242,7 +248,8 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_only_null) {
         auto input_array = ColumnHelper::create_const_null_column(2);
         auto key_array = ColumnHelper::create_const_null_column(2);
 
-        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        const auto result =
+                CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
         ASSERT_EQ(2, result->size());
         ASSERT_TRUE(result->is_null(0));
         ASSERT_TRUE(result->is_null(1));
@@ -254,10 +261,177 @@ TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_only_null) {
         key_array->append_datum(DatumArray{"e1", "e2"});
         key_array->append_datum(DatumArray{"e1", "e2", "e2", "e4"});
 
-        const auto result = CelonisArrayFunctions::dedup_sorted_by(nullptr, {input_array, key_array}).value();
+        const auto result =
+                CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(nullptr, {input_array, key_array}).value();
         ASSERT_EQ(2, result->size());
         ASSERT_TRUE(result->is_null(0));
         ASSERT_TRUE(result->is_null(1));
+    }
+}
+
+TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_int_keys) {
+    {
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        input_array->append_datum(DatumArray{"10", "20", "21", "three0", "31", "32"});
+        input_array->append_datum(DatumArray{"10", "11", "20", "21", "22", "30", "31"});
+
+        auto key_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        key_array->append_datum(DatumArray{1, 2, 2, 3, 3, 3});
+        key_array->append_datum(DatumArray{1, 1, 2, 2, 2, 3, 3});
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_EQ(3, result->get(0).get_array().size());
+        EXPECT_EQ("10", result->get(0).get_array()[0].get_slice());
+        EXPECT_EQ("20", result->get(0).get_array()[1].get_slice());
+        EXPECT_EQ("three0", result->get(0).get_array()[2].get_slice());
+        ASSERT_EQ(3, result->get(1).get_array().size());
+        EXPECT_EQ("10", result->get(1).get_array()[0].get_slice());
+        EXPECT_EQ("20", result->get(1).get_array()[1].get_slice());
+        EXPECT_EQ("30", result->get(1).get_array()[2].get_slice());
+    }
+    {
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        input_array->append_datum(DatumArray{10, 11, Datum{}, 21, 30, 31});
+
+        auto key_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        key_array->append_datum(DatumArray{7, 7, 8, 8, 7, 7});
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(1, result->size());
+        ASSERT_EQ(3, result->get(0).get_array().size());
+        EXPECT_EQ(10, result->get(0).get_array()[0].get_int32());
+        EXPECT_TRUE(result->get(0).get_array()[1].is_null());
+        EXPECT_EQ(30, result->get(0).get_array()[2].get_int32());
+    }
+}
+
+TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_int_keys_null_array) {
+    {
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+        input_array->append_datum(Datum{});
+        input_array->append_datum(DatumArray{1, 2, 3, 4});
+
+        auto key_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        key_array->append_datum(DatumArray{1, 2});
+        key_array->append_datum(DatumArray{1, 2, 2, 4});
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_TRUE(result->is_null(0));
+        ASSERT_EQ(3, result->get(1).get_array().size());
+        EXPECT_EQ(1, result->get(1).get_array()[0].get_int32());
+        EXPECT_EQ(2, result->get(1).get_array()[1].get_int32());
+        EXPECT_EQ(4, result->get(1).get_array()[2].get_int32());
+    }
+    {
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+        input_array->append_datum(DatumArray{1, 2, 2, 4});
+        input_array->append_datum(Datum{});
+
+        auto key_array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+        key_array->append_datum(DatumArray{1, 2, 2, 4});
+        key_array->append_datum(Datum{});
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_EQ(3, result->get(0).get_array().size());
+        EXPECT_EQ(1, result->get(0).get_array()[0].get_int32());
+        EXPECT_EQ(2, result->get(0).get_array()[1].get_int32());
+        EXPECT_EQ(4, result->get(0).get_array()[2].get_int32());
+        ASSERT_TRUE(result->is_null(1));
+    }
+    {
+        auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        input_array->append_datum(DatumArray{1, 2, 3, 4});
+
+        auto key_array = ColumnHelper::create_column(TYPE_ARRAY_INT, true);
+        key_array->append_datum(Datum{});
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(nullptr, {input_array, key_array});
+        ASSERT_TRUE(result.status().is_invalid_argument());
+        EXPECT_EQ(result.status().message(), "The size of input_array and key_array should not be different.");
+    }
+}
+
+TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_int_keys_null_elements) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    input_array->append_datum(DatumArray{1, 2, 3, 4});
+
+    auto key_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    key_array->append_datum(DatumArray{Datum{}, 1, 2, 2});
+
+    const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(nullptr, {input_array, key_array});
+    ASSERT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ(result.status().message(), "key_array should not have null elements.");
+}
+
+TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_int_keys_array_size_mismatch) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    input_array->append_datum(DatumArray{1, 2, 3, 4});
+
+    auto key_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    key_array->append_datum(DatumArray{1, 2, 2});
+
+    const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(nullptr, {input_array, key_array});
+    ASSERT_TRUE(result.status().is_invalid_argument());
+    EXPECT_EQ(result.status().message(), "The size of input_array and key_array should not be different.");
+}
+
+TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_int_keys_empty_input_array) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    input_array->append_datum(DatumArray{1, 2, 3, 4});
+    input_array->append_datum(DatumArray{});
+
+    auto key_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    key_array->append_datum(DatumArray{1, 2, 3, 4});
+    key_array->append_datum(DatumArray{});
+
+    const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(nullptr, {input_array, key_array}).value();
+    ASSERT_EQ(2, result->size());
+    ASSERT_EQ(4, result->get(0).get_array().size());
+    ASSERT_EQ(0, result->get(1).get_array().size());
+}
+
+TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_int_keys_only_null) {
+    {
+        auto input_array = ColumnHelper::create_const_null_column(2);
+        auto key_array = ColumnHelper::create_const_null_column(2);
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_TRUE(result->is_null(0));
+        ASSERT_TRUE(result->is_null(1));
+    }
+    {
+        auto input_array = ColumnHelper::create_const_null_column(2);
+
+        auto key_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+        key_array->append_datum(DatumArray{1, 2});
+        key_array->append_datum(DatumArray{1, 2, 2, 4});
+
+        const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(nullptr, {input_array, key_array}).value();
+        ASSERT_EQ(2, result->size());
+        ASSERT_TRUE(result->is_null(0));
+        ASSERT_TRUE(result->is_null(1));
+    }
+}
+
+TEST_F(CelonisArrayFunctionsTest, dedup_sorted_by_int_keys_const_input) {
+    auto input_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    input_array->append_datum(DatumArray{1, 2, 3, 4});
+
+    auto key_array = ColumnHelper::create_column(TYPE_ARRAY_INT, false);
+    key_array->append_datum(DatumArray{1, 1, 2, 2});
+
+    const auto result = CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(
+                                nullptr, {ConstColumn::create(input_array, 3), ConstColumn::create(key_array, 3)})
+                                .value();
+    ASSERT_EQ(3, result->size());
+    for (size_t row = 0; row < 3; ++row) {
+        ASSERT_EQ(2, result->get(row).get_array().size());
+        EXPECT_EQ(1, result->get(row).get_array()[0].get_int32());
+        EXPECT_EQ(3, result->get(row).get_array()[1].get_int32());
     }
 }
 

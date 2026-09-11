@@ -25,13 +25,13 @@ public:
 
     /**
      * @param: [input_array, key_array]
-     * @paramType: [ANY_ARRAY, ARRAY_VARCHAR]
+     * @paramType: [ANY_ARRAY, ARRAY_VARCHAR | ARRAY_INT]
      * @return: input_array type
      * Returns first elements of input_array that correspond to unique elements of key_array.
      * input_array and key_array should have the same number of elements.
      * key_array should not be NULL and should not have NULL elements.
      */
-    DEFINE_VECTORIZED_FN(dedup_sorted_by);
+    DEFINE_VECTORIZED_FN_TEMPLATE(dedup_sorted_by);
 
     /**
      * @param: [activity_array]

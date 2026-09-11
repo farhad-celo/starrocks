@@ -608,7 +608,8 @@ class DecodeContext {
                 useAnchor = true;
                 newChildren = Lists.newArrayList();
                 newChildren.add(defineOrRewrite(call.getChild(0), supportColumns));
-                boolean useDefine = call.getFnName().equals(FunctionSet.ARRAY_SORTBY);
+                boolean useDefine = call.getFnName().equals(FunctionSet.ARRAY_SORTBY)
+                        || call.getFnName().equals(FunctionSet.CELONIS_DEDUP_SORTED_BY);
                 for (int i = 1; i < call.getChildren().size(); ++i) {
                     newChildren.add(useDefine ? defineOrRewrite(call.getChild(i), supportColumns)
                             : rewrite(call.getChild(i), supportColumns));

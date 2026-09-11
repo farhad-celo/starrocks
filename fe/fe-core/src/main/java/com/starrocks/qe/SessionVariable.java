@@ -408,6 +408,8 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
             "enable_multi_input_functions_low_cardinality_optimize";
     public static final String ENABLE_ARRAY_MAP_LOW_CARDINALITY_OPTIMIZE = "enable_array_map_low_cardinality_optimize";
     public static final String ENABLE_MULTI_IN_LOW_CARDINALITY_OPTIMIZE = "enable_multi_in_low_cardinality_optimize";
+    public static final String ENABLE_DEDUP_SORTED_BY_LOW_CARDINALITY_OPTIMIZE =
+            "enable_dedup_sorted_by_low_cardinality_optimize";
     public static final String MULTI_ARRAY_AGG_MAX_ARRAY_LENGTH = "multi_array_agg_max_array_length";
     public static final String MULTI_ARRAY_AGG_WARN_ARRAY_LENGTH = "multi_array_agg_warn_array_length";
     public static final String CBO_USE_NTH_EXEC_PLAN = "cbo_use_nth_exec_plan";
@@ -1678,6 +1680,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VariableMgr.VarAttr(name = ENABLE_MULTI_IN_LOW_CARDINALITY_OPTIMIZE)
     private boolean enableMultiInLowCardinalityOptimize = true;
 
+    @VariableMgr.VarAttr(name = ENABLE_DEDUP_SORTED_BY_LOW_CARDINALITY_OPTIMIZE)
+    private boolean enableDedupSortedByLowCardinalityOptimize = false;
+
     // Per-session override for the maximum number of elements that multi_array_agg (v1 and v2) is
     // allowed to accumulate per group. 0 means "not set" -- in that case the cluster-level config
     // `array_agg_size_limit` (BE) is used instead. Valid range is [0, 2^32].
@@ -2210,6 +2215,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public boolean isEnableMultiInLowCardinalityOptimize() {
         return enableMultiInLowCardinalityOptimize;
+    }
+
+    public boolean isEnableDedupSortedByLowCardinalityOptimize() {
+        return enableDedupSortedByLowCardinalityOptimize;
+    }
+
+    public void setEnableDedupSortedByLowCardinalityOptimize(boolean enableDedupSortedByLowCardinalityOptimize) {
+        this.enableDedupSortedByLowCardinalityOptimize = enableDedupSortedByLowCardinalityOptimize;
     }
 
     public void setEnableShortenedVariantLowCardinalityOptimize(boolean enableShortenedVariantLowCardinalityOptimize) {

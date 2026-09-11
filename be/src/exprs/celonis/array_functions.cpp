@@ -334,6 +334,7 @@ StatusOr<ColumnPtr> CelonisArrayFunctions::merge_sorted_arrays([[maybe_unused]] 
     return CelonisMergeSortedArrays::process(columns);
 }
 
+template <LogicalType KeyType>
 class CelonisDedupSortedBy {
 public:
     static StatusOr<ColumnPtr> process(const Columns& columns) {
@@ -395,7 +396,7 @@ private:
         int new_offset = 0;
 
         const auto& key_data_column = down_cast<const NullableColumn&>(key_element_column).data_column_ref();
-        const auto& key_data = down_cast<const RunTimeColumnType<TYPE_VARCHAR>&>(key_data_column).get_data();
+        const auto& key_data = down_cast<const RunTimeColumnType<KeyType>&>(key_data_column).get_data();
 
         for (size_t i = 0; i < chunk_size; i++) {
             size_t start = src_offsets[i];
@@ -426,10 +427,14 @@ private:
     }
 };
 
+template <LogicalType KeyType>
 StatusOr<ColumnPtr> CelonisArrayFunctions::dedup_sorted_by([[maybe_unused]] FunctionContext* context,
                                                            const Columns& columns) {
-    return CelonisDedupSortedBy::process(columns);
+    return CelonisDedupSortedBy<KeyType>::process(columns);
 }
+
+template StatusOr<ColumnPtr> CelonisArrayFunctions::dedup_sorted_by<TYPE_VARCHAR>(FunctionContext*, const Columns&);
+template StatusOr<ColumnPtr> CelonisArrayFunctions::dedup_sorted_by<TYPE_INT>(FunctionContext*, const Columns&);
 
 StatusOr<ColumnPtr> CelonisArrayFunctions::activities_to_variant([[maybe_unused]] FunctionContext* context,
                                                                  const Columns& columns) {

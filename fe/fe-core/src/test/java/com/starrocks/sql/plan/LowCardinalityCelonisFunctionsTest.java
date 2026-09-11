@@ -783,4 +783,47 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 "named_struct('c1', [dict_encode('a', 7),dict_encode('b', 7)], 'c2', [1,2], " +
                 "'c3', [dict_encode('x', 8),dict_encode('y', 8)]))\n"), plan);
     }
+
+    @Test
+    public void testCelonisDedupSortedBy() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_dedup_sorted_by_low_cardinality_optimize', 'true') */
+                CELONIS_DEDUP_SORTED_BY(string_array1, string_array2)
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("DictDecode(8: string_array1, [<place-holder>], " +
+                "celonis_dedup_sorted_by(8: string_array1, 9: string_array2))\n"), plan);
+
+        IDictManager dictManager = IDictManager.getInstance();
+        new Expectations(dictManager) {
+            {
+                dictManager.hasGlobalDict(anyLong, ColumnId.create("string_array1"), anyLong);
+                result = new boolean[] { false, true };
+            }
+        };
+        plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("celonis_dedup_sorted_by(2: string_array1, 8: string_array2)"), plan);
+        new Expectations(dictManager) {
+            {
+                dictManager.hasGlobalDict(anyLong, ColumnId.create("string_array2"), anyLong);
+                result = false;
+            }
+        };
+        plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("DictDecode(8: string_array1, [<place-holder>], " +
+                "celonis_dedup_sorted_by(8: string_array1, 3: string_array2))"), plan);
+    }
+
+    @Test
+    public void testCelonisDedupSortedByDisabled() throws Exception {
+        String sql = """
+                SELECT /*+ SET_VAR('enable_dedup_sorted_by_low_cardinality_optimize', 'false') */
+                CELONIS_DEDUP_SORTED_BY(string_array1, string_array2)
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("<slot 7> : celonis_dedup_sorted_by(2: string_array1, 3: string_array2)"),
+                plan);
+    }
 }
