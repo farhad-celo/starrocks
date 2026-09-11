@@ -203,7 +203,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.ARRAY_FILTER, FunctionSet.ARRAY_SORTBY, FunctionSet.ARRAY_MAP);
 
     public static final Set<String> CELONIS_LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS = ImmutableSet.of(
-            FunctionSet.CELONIS_DEDUP_SORTED_BY, FunctionSet.CELONIS_CALC_THROUGHPUT);
+            FunctionSet.CELONIS_DEDUP_SORTED_BY, FunctionSet.CELONIS_CALC_THROUGHPUT, FunctionSet.CELONIS_ARRAY_SOURCES,
+            FunctionSet.CELONIS_ARRAY_TARGETS);
 
     static {
         LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS.addAll(CELONIS_LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS);

@@ -875,4 +875,20 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
         Assertions.assertTrue(plan.contains("celonis_calc_throughput(5: ACTIVITIES, 3: TIMESTAMPS, " +
                 "dict_encode('a', 5), dict_encode('', 5), 'first', 'last')"), plan);
     }
+
+    @Test
+    public void testCelonisArraySourcesTargets() throws Exception {
+        String sql = """
+                SELECT
+                CELONIS_ARRAY_SOURCES(string_array1, 'first->any'),
+                CELONIS_ARRAY_TARGETS(string_array2, 'any->any', integer_array)
+                FROM multi_input_functions_test_table
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("DictDecode(9: string_array1, [<place-holder>], " +
+                "celonis_array_sources(9: string_array1, 'first->any'))"), plan);
+        Assertions.assertTrue(plan.contains("DictDecode(10: string_array2, [<place-holder>], " +
+                "celonis_array_targets(10: string_array2, 'any->any', CAST(6: integer_array AS ARRAY<BIGINT>)))"),
+                plan);
+    }
 }

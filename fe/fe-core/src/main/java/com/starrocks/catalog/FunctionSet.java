@@ -593,6 +593,8 @@ public class FunctionSet {
     public static final String CELONIS_INDEX_ACTIVITY = "celonis_index_activity";
     public static final String CELONIS_MATCH_ACTIVITIES = "celonis_match_activities";
     public static final String CELONIS_CALC_THROUGHPUT = "celonis_calc_throughput";
+    public static final String CELONIS_ARRAY_SOURCES = "celonis_array_sources";
+    public static final String CELONIS_ARRAY_TARGETS = "celonis_array_targets";
 
     // Celonis window functions:
     public static final String CELONIS_LINEAR_INTERPOLATE = "celonis_linear_interpolate";
