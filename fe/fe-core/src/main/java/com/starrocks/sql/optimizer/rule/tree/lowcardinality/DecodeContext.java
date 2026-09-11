@@ -627,6 +627,7 @@ class DecodeContext {
                 StructType inputType = (StructType) call.getChild(0).getType();
                 CallOperator matchCall = call.getChild(1).cast();
                 List<ScalarOperator> newMatchChildren = Lists.newArrayList(matchCall.getChildren());
+                boolean isNamed = matchCall.getFnName().equals(FunctionSet.NAMED_STRUCT);
                 for (int i = 0; i < inputType.getFields().size(); ++i) {
                     String fieldName = inputType.getField(i).getName();
                     if (!fieldsMap.containsKey(fieldName)) {
@@ -635,7 +636,8 @@ class DecodeContext {
                     ColumnRefOperator stringRef = fieldsMap.get(inputType.getField(i).getName());
                     ColumnRefOperator dictRef = stringRefToDictRefMap.get(stringRef);
                     Preconditions.checkNotNull(dictRef);
-                    newMatchChildren.set(i, dictEncodeConstant(newMatchChildren.get(i), dictRef.getId()));
+                    int idx = isNamed ? 2 * i + 1 : i;
+                    newMatchChildren.set(idx, dictEncodeConstant(newMatchChildren.get(idx), dictRef.getId()));
                 }
                 return buildCallOperator(call,
                         List.of(newInput, buildCallOperator(matchCall, newMatchChildren)));

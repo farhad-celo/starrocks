@@ -15,6 +15,7 @@
 package com.starrocks.sql.optimizer.rule.tree.lowcardinality;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -178,6 +179,9 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
     static {
         LOW_CARD_STRUCT_FUNCTIONS.addAll(CELONIS_LOW_CARD_STRUCT_FUNCTIONS);
     }
+
+    private static final List<String> STRUCT_GENERATORS_FNS = ImmutableList.of(FunctionSet.ROW, FunctionSet.STRUCT,
+            FunctionSet.NAMED_STRUCT);
 
     // array<string> support:
     //  array<string> -> array<string>: array function
@@ -1595,8 +1599,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         }
 
         private static boolean isSupportedMultiInMatchConfig(ScalarOperator input, ScalarOperator match) {
-            if (!(match instanceof CallOperator matchCall) || !(matchCall.getFnName().equals(FunctionSet.ROW) ||
-                    matchCall.getFnName().equals(FunctionSet.STRUCT))) {
+            if (!(match instanceof CallOperator matchCall) || !STRUCT_GENERATORS_FNS.contains(matchCall.getFnName())) {
                 return false;
             }
             if (!input.getType().isStructType()) {
@@ -1609,7 +1612,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             }
             for (int i = 0; i < inputType.getFields().size(); ++i) {
                 Type inputFieldType = inputType.getField(i).getType();
-                Type matchFieldType = match.getChild(i).getType();
+                Type matchFieldType = matchType.getField(i).getType();
                 if (inputFieldType.isArrayType() || !matchFieldType.isArrayType()) {
                     return false;
                 }
@@ -1619,7 +1622,9 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 }
             }
             int tupleCount = -1;
-            for (ScalarOperator field : match.getChildren()) {
+            boolean isNamed = matchCall.getFnName().equals(FunctionSet.NAMED_STRUCT);
+            for (int i = isNamed ? 1 : 0; i < match.getChildren().size(); i += isNamed ? 2 : 1) {
+                ScalarOperator field = match.getChild(i);
                 if (!(field instanceof ArrayOperator array)
                         || !array.getChildren().stream().allMatch(ScalarOperator::isConstantRef)) {
                     return false;

@@ -768,4 +768,19 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 "5: INTEGER_COL, 'col3', DictDecode(6: VARCHAR_COL2, [<place-holder>], 6: VARCHAR_COL2)), " +
                 "row(['a','b'], [1,2], ['x','y']))"), plan);
     }
+
+    @Test
+    public void testCelonisMultiInNamedStruct() throws Exception {
+        String sql = """
+                SELECT 
+                celonis_multi_in(row(VARCHAR_COL, INTEGER_COL, VARCHAR_COL2), 
+                named_struct('c1', ['a', 'b'], 'c2', [1, 2], 'c3', ['x', 'y'])) 
+                FROM T
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("celonis_multi_in(" +
+                "row(7: VARCHAR_COL, 5: INTEGER_COL, 8: VARCHAR_COL2), " +
+                "named_struct('c1', [dict_encode('a', 7),dict_encode('b', 7)], 'c2', [1,2], " +
+                "'c3', [dict_encode('x', 8),dict_encode('y', 8)]))\n"), plan);
+    }
 }
