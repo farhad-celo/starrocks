@@ -203,7 +203,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.ARRAY_FILTER, FunctionSet.ARRAY_SORTBY, FunctionSet.ARRAY_MAP);
 
     public static final Set<String> CELONIS_LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS = ImmutableSet.of(
-            FunctionSet.CELONIS_DEDUP_SORTED_BY);
+            FunctionSet.CELONIS_DEDUP_SORTED_BY, FunctionSet.CELONIS_CALC_THROUGHPUT);
 
     static {
         LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS.addAll(CELONIS_LOW_CARD_MULTI_INPUT_ARRAY_FUNCTIONS);
@@ -1731,6 +1731,12 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 List<ScalarOperator> newChildren = visitChildren(call, context);
                 if (newChildren.stream().allMatch(CONSTANTS::equals)) {
                     return CONSTANTS;
+                }
+                if (FunctionSet.CELONIS_CALC_THROUGHPUT.equals(call.getFnName()) && (
+                        !newChildren.subList(2, newChildren.size()).stream().allMatch(CONSTANTS::equals)
+                        || !isSupportedArrayFnConstantParameter(call.getChild(2))
+                        || !isSupportedArrayFnConstantParameter(call.getChild(3)))) {
+                    return forbidden(newChildren, call);
                 }
                 for (int i = 0; i < newChildren.size(); i++) {
                     saveDictExpr(newChildren.get(i), call.getChild(i), true);

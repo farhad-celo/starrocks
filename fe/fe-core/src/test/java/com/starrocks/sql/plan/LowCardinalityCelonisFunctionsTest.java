@@ -826,4 +826,53 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
         Assertions.assertTrue(plan.contains("<slot 7> : celonis_dedup_sorted_by(2: string_array1, 3: string_array2)"),
                 plan);
     }
+
+    @Test
+    public void testCelonisCalcThroughput() throws Exception {
+        String sql = """
+                SELECT
+                CELONIS_CALC_THROUGHPUT(ACTIVITIES, TIMESTAMPS, 'a', 'b', 'first', 'last')
+                FROM TestActivityTimestampTable
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("celonis_calc_throughput(5: ACTIVITIES, 3: TIMESTAMPS, " +
+                "dict_encode('a', 5), dict_encode('b', 5), 'first', 'last')"), plan);
+
+        IDictManager dictManager = IDictManager.getInstance();
+        new Expectations(dictManager) {
+            {
+                dictManager.hasGlobalDict(anyLong, ColumnId.create("ACTIVITIES"), anyLong);
+                result = false;
+            }
+        };
+        plan = getFragmentPlan(sql);
+        Assertions.assertTrue(
+                plan.contains("celonis_calc_throughput(2: ACTIVITIES, 3: TIMESTAMPS, 'a', 'b', 'first', 'last')"),
+                plan);
+    }
+
+    @Test
+    public void testCelonisCalcThroughputUnsupportedConstant() throws Exception {
+        String sql = """
+                SELECT
+                CELONIS_CALC_THROUGHPUT(ACTIVITIES, TIMESTAMPS, ACTIVITIES[1], 'b', 'first', 'last')
+                FROM TestActivityTimestampTable
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("celonis_calc_throughput(DictDecode(5: ACTIVITIES, [<place-holder>]), " +
+                "3: TIMESTAMPS, DictDecode(5: ACTIVITIES, [<place-holder>], 5: ACTIVITIES[1]), 'b', 'first', 'last')"),
+                plan);
+    }
+
+    @Test
+    public void testCelonisCalcThroughputNullValue() throws Exception {
+        String sql = """
+                SELECT
+                CELONIS_CALC_THROUGHPUT(ACTIVITIES, TIMESTAMPS, 'a', NULL, 'first', 'last')
+                FROM TestActivityTimestampTable
+                """;
+        String plan = getFragmentPlan(sql);
+        Assertions.assertTrue(plan.contains("celonis_calc_throughput(5: ACTIVITIES, 3: TIMESTAMPS, " +
+                "dict_encode('a', 5), dict_encode('', 5), 'first', 'last')"), plan);
+    }
 }

@@ -459,8 +459,7 @@ class DecodeContext {
         } else if (result.isColumnRef() && encoder.getAnchorOp() == null) {
             // decode array-column-ref
             return new DictMappingOperator(useDictRef, result, expression.getType());
-        } else if (result instanceof CallOperator
-                && LOW_CARD_ARRAY_FUNCTIONS.contains(((CallOperator) result).getFnName())
+        } else if (result instanceof CallOperator call && isSupportedArrayFunction(call)
                 && !supportLowCardinality(expression.getType())) {
             Preconditions.checkState(encoder.getAnchorOp() == null);
             return result;
@@ -613,6 +612,21 @@ class DecodeContext {
                 for (int i = 1; i < call.getChildren().size(); ++i) {
                     newChildren.add(useDefine ? defineOrRewrite(call.getChild(i), supportColumns)
                             : rewrite(call.getChild(i), supportColumns));
+                }
+                if (FunctionSet.CELONIS_CALC_THROUGHPUT.equals(call.getFnName())) {
+                    ColumnRefOperator stringRef = getUseStringRef(call);
+                    ColumnRefOperator dictRef = stringRef != null && supportColumns.contains(stringRef)
+                            ? stringRefToDictRefMap.get(stringRef) : null;
+                    if (dictRef != null) {
+                        for (int i = 2; i < 4; ++i) {
+                            // Backend replaces nulls with default values, so for varchar case null is interpreted as ''
+                            // which can have a dictionary code different than default integer value (0).
+                            if (newChildren.get(i).isConstantNull()) {
+                                newChildren.set(i, ConstantOperator.createVarchar(""));
+                            }
+                            newChildren.set(i, dictEncodeConstant(newChildren.get(i), dictRef.getId()));
+                        }
+                    }
                 }
                 for (int i = 0; i < newChildren.size(); ++i) {
                     hasChange[0] |= newChildren.get(i) != call.getChild(i);
