@@ -15,6 +15,7 @@ metadata:
     backstage.io/techdocs-entity: system:celostar
     prr-slo.celonis.dev/alerts_slack_channel: celostar-oncall
     prr-slo.celonis.dev/opsgenie_handle: Celostar
+    secauto.celosec.com/sca-exclude-paths: '["docs/", "test/requirements.txt"]'
   links:
     - title: Celostar JIRA
       url: https://celonis.atlassian.net/jira/software/c/projects/CELOSTAR/boards/925
