@@ -891,4 +891,76 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 "celonis_array_targets(10: string_array2, 'any->any', CAST(6: integer_array AS ARRAY<BIGINT>)))"),
                 plan);
     }
+
+    @Test
+    public void testComplexUnion() throws Exception {
+        String sql = """
+                SELECT MAX(ARRAY_SORT(ACTIVITIES)[1])
+                FROM TestActivityTimestampTable
+                UNION ALL
+                SELECT string_array1[1] FROM multi_input_functions_test_table
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("  8:Decode\n" +
+                "  |  <dict id 20> : <string id 14>\n" +
+                "  |  cardinality: 2\n" +
+                "  |  \n" +
+                "  0:UNION\n" +
+                "  |  output exprs:\n" +
+                "  |      [20, INT, true]\n" +
+                "  |  child exprs:\n" +
+                "  |      [18: max, INT, true]\n" +
+                "  |      [19: cast, INT, true]"), plan);
+        IDictManager dictManager = IDictManager.getInstance();
+        new Expectations(dictManager) {
+            {
+                dictManager.hasGlobalDict(anyLong, ColumnId.create("ACTIVITIES"), anyLong);
+                result = false;
+            }
+        };
+        plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("  0:UNION\n" +
+                "  |  output exprs:\n" +
+                "  |      [14, VARCHAR, true]\n" +
+                "  |  child exprs:\n" +
+                "  |      [5: max, VARCHAR, true]\n" +
+                "  |      [13: cast, VARCHAR, true]\n" +
+                "  |  pass-through-operands: all\n" +
+                "  |  cardinality: 2\n" +
+                "  |  \n" +
+                "  |----8:Decode\n" +
+                "  |    |  <dict id 16> : <string id 13>\n" +
+                "  |    |  cardinality: 1"), plan);
+    }
+
+    @Test
+    public void testComplexUnionWithDictModifyingFunction() throws Exception {
+        String sql = """
+                SELECT MAX(UPPER(ACTIVITIES[1]))
+                FROM TestActivityTimestampTable
+                UNION ALL
+                SELECT string_array1[1] FROM multi_input_functions_test_table
+                """;
+        String plan = getVerboseExplain(sql);
+        Assertions.assertTrue(plan.contains("  0:UNION\n" +
+                "  |  output exprs:\n" +
+                "  |      [14, VARCHAR, true]\n" +
+                "  |  child exprs:\n" +
+                "  |      [5: max, VARCHAR, true]\n" +
+                "  |      [13: cast, VARCHAR, true]\n" +
+                "  |  pass-through-operands: all\n" +
+                "  |  cardinality: 2\n" +
+                "  |  \n" +
+                "  |----9:Decode\n" +
+                "  |    |  <dict id 19> : <string id 13>\n" +
+                "  |    |  cardinality: 1\n" +
+                "  |    |  \n" +
+                "  |    8:EXCHANGE\n" +
+                "  |       distribution type: ROUND_ROBIN\n" +
+                "  |       cardinality: 1\n" +
+                "  |    \n" +
+                "  5:Decode\n" +
+                "  |  <dict id 18> : <string id 5>\n" +
+                "  |  cardinality: 1"), plan);
+    }
 }

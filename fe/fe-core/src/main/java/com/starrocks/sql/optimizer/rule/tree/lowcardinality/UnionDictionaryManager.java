@@ -16,9 +16,11 @@ package com.starrocks.sql.optimizer.rule.tree.lowcardinality;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.Config;
 import com.starrocks.common.util.UnionFind;
@@ -26,7 +28,9 @@ import com.starrocks.metric.MetricLabel;
 import com.starrocks.metric.celonis.CelonisMetrics;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.sql.optimizer.base.ColumnRefSet;
+import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
+import com.starrocks.sql.optimizer.operator.scalar.CollectionElementOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
@@ -49,9 +53,20 @@ public class UnionDictionaryManager {
     private final Set<Integer> joinEqColumnGroupIds;
     private final Map<Integer, ByteBuffer> constantColumns = Maps.newHashMap();
 
-    private static final int CONSTANT_ID = -1;
-
     private final Set<Integer> generatedDictionaryIds = Sets.newHashSet();
+
+    private static final Set<String> DICT_PRESERVING_FNS = ImmutableSet.of(
+            FunctionSet.ARRAY_MIN, FunctionSet.ARRAY_MAX, FunctionSet.ARRAY_DISTINCT, FunctionSet.ARRAY_SORT,
+            FunctionSet.ARRAY_SLICE, FunctionSet.ARRAY_INTERSECT, FunctionSet.ARRAY_REMOVE,
+            FunctionSet.ARRAY_FILTER, FunctionSet.ARRAY_SORTBY,
+            FunctionSet.MAX, FunctionSet.MIN, FunctionSet.ANY_VALUE, FunctionSet.ARRAY_AGG,
+            FunctionSet.LAG, FunctionSet.LEAD, FunctionSet.FIRST_VALUE, FunctionSet.LAST_VALUE,
+
+            // Celonis
+            FunctionSet.CELONIS_SHORTENED_VARIANT, FunctionSet.CELONIS_ARRAY_FIRST, FunctionSet.CELONIS_ARRAY_LAST,
+            FunctionSet.CELONIS_ARRAY_LAG, FunctionSet.CELONIS_ARRAY_LEAD, FunctionSet.CELONIS_CALC_CROP_TO_NULL,
+            FunctionSet.CELONIS_NULL_TO_EMPTY,
+            FunctionSet.CELONIS_SORTED_FIRST, FunctionSet.CELONIS_SORTED_LAST);
 
     public UnionDictionaryManager(SessionVariable sessionVariable,
                                   Map<Integer, ScalarOperator> stringRefToDefineExprMap,
@@ -66,6 +81,19 @@ public class UnionDictionaryManager {
     static void logUnionAllDecodeMetric(String reason) {
         CelonisMetrics.increaseCounter("lco_union_all_decode", "lco union all decode",
                 new MetricLabel("reason", reason));
+    }
+
+    static void logUnionAllComplexInputDecodeMetric(ScalarOperator op) {
+        final String name;
+        if (op instanceof CastOperator cast) {
+            name = "cast_" + cast.getType().getPrimitiveType();
+        } else if (op instanceof CallOperator call) {
+            name = call.getFnName();
+        } else {
+            name = op.getOpType().name();
+        }
+        CelonisMetrics.increaseCounter("lco_union_all_complex_column_decode", "lco union all complex column decode",
+                new MetricLabel("reason", name));
     }
 
     private static ImmutableMap<ByteBuffer, Integer> mergeDictionaryData(List<ImmutableMap<ByteBuffer, Integer>> dicts,
@@ -97,22 +125,27 @@ public class UnionDictionaryManager {
         return builder.build();
     }
 
+    private Integer getSourceDictionaryColumnId(ScalarOperator op) {
+        if (op instanceof ColumnRefOperator ref) {
+            return getSourceDictionaryColumnId(ref.getId());
+        }
+        if (op instanceof CollectionElementOperator || op instanceof CastOperator && op.getType().isStringType()
+                || op instanceof CallOperator call && DICT_PRESERVING_FNS.contains(call.getFnName())) {
+            return getSourceDictionaryColumnId(op.getChild(0));
+        }
+        logUnionAllComplexInputDecodeMetric(op);
+        return null;
+    }
+
     private Integer getSourceDictionaryColumnId(Integer cid) {
         if (globalDicts.containsKey(cid)) {
             return cid;
         }
-        if (constantColumns.containsKey(cid)) {
-            return CONSTANT_ID;
-        }
         ScalarOperator define = stringRefToDefineExprMap.get(cid);
-        if (define == null || !define.isColumnRef()) {
+        if (define == null || define instanceof ColumnRefOperator ref && ref.getId() == cid) {
             return null;
         }
-        int newId = ((ColumnRefOperator) define).getId();
-        if (newId == cid) {
-            return null;
-        }
-        return getSourceDictionaryColumnId(newId);
+        return getSourceDictionaryColumnId(define);
     }
 
     Integer mergeDictionaries(List<Integer> columnIds, Integer outputColumnId) {
@@ -122,10 +155,10 @@ public class UnionDictionaryManager {
         }
         List<ByteBuffer> allConstantData =
                 columnIds.stream().map(constantColumns::get).filter(Objects::nonNull).toList();
-        List<Integer> nonConstantColumnIds = columnIds.stream().map(this::getSourceDictionaryColumnId)
-                .filter(cid -> cid == null || cid != CONSTANT_ID).toList();
+        List<Integer> nonConstantColumnIds = columnIds.stream().filter(c -> !constantColumns.containsKey(c))
+                .map(this::getSourceDictionaryColumnId).toList();
         if (nonConstantColumnIds.contains(null)) {
-            logUnionAllDecodeMetric("non_column_dict_branches");
+            logUnionAllDecodeMetric("non_dictified_or_non_column_dict_branches");
             return null;
         }
         if (nonConstantColumnIds.stream().anyMatch(joinEqColumnGroupIds::contains)) {
