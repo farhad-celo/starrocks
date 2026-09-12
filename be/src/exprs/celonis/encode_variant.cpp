@@ -1,8 +1,11 @@
 #include "exprs/celonis/encode_variant.h"
 
+#include <utility>
+
 #include "column/array_column.h"
 #include "column/column_helper.h"
 #include "column/column_viewer.h"
+#include "column/const_column.h"
 #include "column/hash_set.h"
 #include "exprs/builtin_functions.h"
 #include "exprs/celonis/util.h"
@@ -116,10 +119,14 @@ StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_non_constant_map([[mayb
         offset += count;
     }
     array_offsets->append(offset);
-    return NullableColumn::create(
+    ColumnPtr result = NullableColumn::create(
             ArrayColumn::create(NullableColumn::create(array_index_column, NullColumn::create(offset, 0)),
                                 array_offsets),
             null_column);
+    if (all_const) {
+        return ConstColumn::create(std::move(result), columns[0]->size());
+    }
+    return result;
 }
 
 StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_constant_map([[maybe_unused]] FunctionContext* context,
@@ -162,10 +169,14 @@ StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant_constant_map([[maybe_un
         offset += count;
     }
     array_offsets->append(offset);
-    return NullableColumn::create(
+    ColumnPtr result = NullableColumn::create(
             ArrayColumn::create(NullableColumn::create(array_index_column, NullColumn::create(offset, 0)),
                                 array_offsets),
             null_column);
+    if (all_const) {
+        return ConstColumn::create(std::move(result), columns[0]->size());
+    }
+    return result;
 }
 
 StatusOr<ColumnPtr> CelonisEncodeVariant::encode_variant(FunctionContext* context, const Columns& columns) {

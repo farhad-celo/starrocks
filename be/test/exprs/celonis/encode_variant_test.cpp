@@ -161,4 +161,40 @@ TEST_F(CelonisEncodeVariantTest, non_const_map_normal_case) {
     Validate(result, 5, std::vector<int32_t>{2, 3, 0, -1});
 }
 
+TEST_F(CelonisEncodeVariantTest, const_variant_with_const_map) {
+    Prepare();
+
+    constexpr size_t num_rows = 3;
+    variant_column_->append_datum(DatumArray{"B2", kNullDatum, "A1", "B2", "W3"});
+    variant_column_ = ConstColumn::create(variant_column_, num_rows);
+
+    const auto result_or = RunConstantMap(DatumArray{"A1", kNullDatum, "B2", "A1"});
+    ASSERT_TRUE(result_or.ok()) << result_or.status().to_string();
+    const auto result = result_or.value();
+    ASSERT_TRUE(result->is_constant());
+    ASSERT_EQ(num_rows, result->size());
+    for (size_t row = 0; row < num_rows; ++row) {
+        Validate(result, row, std::vector<int32_t>{1, 0, 1, -1});
+    }
+}
+
+TEST_F(CelonisEncodeVariantTest, const_variant_with_runtime_const_map) {
+    Prepare();
+
+    constexpr size_t num_rows = 3;
+    AddRow(DatumArray{"B2", kNullDatum, "A1", "B2", "W3"}, DatumArray{"A1", kNullDatum, "B2", "A1"});
+    variant_column_ = ConstColumn::create(variant_column_, num_rows);
+    activity_array_column_ = ConstColumn::create(activity_array_column_, num_rows);
+
+    // The map is constant for this chunk but was not marked constant in the function context.
+    const auto result_or = Run();
+    ASSERT_TRUE(result_or.ok()) << result_or.status().to_string();
+    const auto result = result_or.value();
+    ASSERT_TRUE(result->is_constant());
+    ASSERT_EQ(num_rows, result->size());
+    for (size_t row = 0; row < num_rows; ++row) {
+        Validate(result, row, std::vector<int32_t>{1, 0, 1, -1});
+    }
+}
+
 } // namespace starrocks
