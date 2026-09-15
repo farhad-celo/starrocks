@@ -109,6 +109,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import static com.starrocks.connector.delta.DeltaRowTrackingUtils.getDeltaRowTrackingColumns;
 import static com.starrocks.sql.analyzer.AstToStringBuilder.getAliasName;
 import static com.starrocks.sql.common.UnsupportedException.unsupportedException;
 import static com.starrocks.thrift.PlanNodesConstants.BINLOG_OP_COLUMN_NAME;
@@ -721,6 +722,7 @@ public class QueryAnalyzer {
                 List<Column> extensionColumns = getExtensionColumns(extensionLookupTableName, table);
                 List<Column> fullSchema = new ArrayList<>(table.getFullSchema());
                 fullSchema.addAll(extensionColumns);
+                fullSchema.addAll(getDeltaRowTrackingColumns(table));
                 Set<Column> baseSchema = new HashSet<>(table.getBaseSchema());
 
                 List<String> pruneScanColumns = node.getPruneScanColumns();

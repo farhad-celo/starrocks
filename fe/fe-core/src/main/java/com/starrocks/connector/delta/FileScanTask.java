@@ -27,13 +27,21 @@ public class FileScanTask {
     private final long records;
     private final Map<String, String> partitionValues;
     private final DeletionVectorDescriptor dv;
+    // Per-file default from AddFile row-tracking metadata; null when absent.
+    private final Long defaultRowCommitVersion;
 
     public FileScanTask(FileStatus fileStatus, long records, Map<String, String> partitionValues,
                         DeletionVectorDescriptor dv) {
+        this(fileStatus, records, partitionValues, dv, null);
+    }
+
+    public FileScanTask(FileStatus fileStatus, long records, Map<String, String> partitionValues,
+                        DeletionVectorDescriptor dv, Long defaultRowCommitVersion) {
         this.fileStatus = fileStatus;
         this.records = records;
         this.partitionValues = new CaseInsensitiveMap<>(partitionValues);
         this.dv = dv;
+        this.defaultRowCommitVersion = defaultRowCommitVersion;
     }
 
     public FileStatus getFileStatus() {
@@ -54,5 +62,9 @@ public class FileScanTask {
 
     public DeletionVectorDescriptor getDv() {
         return dv;
+    }
+
+    public Long getDefaultRowCommitVersion() {
+        return defaultRowCommitVersion;
     }
 }

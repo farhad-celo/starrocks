@@ -34,6 +34,7 @@ import com.starrocks.thrift.TTableType;
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.SnapshotImpl;
+import io.delta.kernel.internal.TableConfig;
 import io.delta.kernel.internal.actions.Metadata;
 
 import java.util.List;
@@ -52,6 +53,11 @@ public class DeltaLakeTable extends Table {
     private long version = -1L;
 
     public static final String PARTITION_NULL_VALUE = "null";
+
+    // Hidden Delta row-tracking meta column; excluded from SELECT *, resolves only when referenced.
+    public static final String ROW_COMMIT_VERSION_COLUMN = "$row_commit_version";
+    // Backing slot for the per-file default; coalesced under the materialized column by the planner.
+    public static final String ROW_COMMIT_VERSION_DEFAULT_COLUMN = "$row_commit_version$default";
 
     public DeltaLakeTable() {
         super(TableType.DELTALAKE);
@@ -104,6 +110,18 @@ public class DeltaLakeTable extends Table {
 
     public Metadata getDeltaMetadata() {
         return deltaSnapshot.getMetadata();
+    }
+
+    public boolean isRowTrackingEnabled() {
+        if (deltaSnapshot == null) {
+            return false;
+        }
+        return Boolean.TRUE.equals(TableConfig.ROW_TRACKING_ENABLED.fromMetadata(getDeltaMetadata()));
+    }
+
+    public String getMaterializedRowCommitVersionColumnName() {
+        return getDeltaMetadata().getConfiguration()
+                .get(TableConfig.MATERIALIZED_ROW_COMMIT_VERSION_COLUMN_NAME.getKey());
     }
 
     public Snapshot getDeltaSnapshot() {

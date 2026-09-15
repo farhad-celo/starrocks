@@ -240,6 +240,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.starrocks.catalog.Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF;
+import static com.starrocks.connector.delta.DeltaRowTrackingUtils.isRowCommitVersionColumn;
+import static com.starrocks.connector.delta.DeltaRowTrackingUtils.rewriteDeltaRowCommitVersion;
 import static com.starrocks.sql.common.ErrorType.INTERNAL_ERROR;
 import static com.starrocks.sql.common.UnsupportedException.unsupportedException;
 import static com.starrocks.sql.optimizer.operator.scalar.ScalarOperator.isColumnEqualConstant;
@@ -1273,10 +1275,13 @@ public class PlanFragmentBuilder {
             tupleDescriptor.setTable(referenceTable);
 
             prepareContextSlots(node, context, tupleDescriptor);
+            rewriteDeltaRowCommitVersion(node, context.getDescTbl(), tupleDescriptor, context.getColRefToExpr());
 
             PartitionIdGenerator partitionIdGenerator = context.getDescTbl().getTablePartitionIdGenerator(referenceTable);
             List<String> fieldNames = node.getColRefToColumnMetaMap().keySet().stream()
                     .map(ColumnRefOperator::getName)
+                    // Not a physical Delta column; keep it out of the connector's schema lookup.
+                    .filter(name -> !isRowCommitVersionColumn(name))
                     .collect(Collectors.toList());
             DeltaLakeScanNode deltaLakeScanNode =
                     new DeltaLakeScanNode(context.getNextNodeId(), tupleDescriptor, "DeltaLakeScanNode",

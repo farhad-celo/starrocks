@@ -93,11 +93,12 @@ public class DeltaStatisticProvider {
                 continue;
             }
 
-            if (schema.get(entry.getValue().getName()) == null) {
+            // Non-schema columns (e.g. the virtual $row_commit_version) have no file stats; leave them unknown.
+            if (schema.indexOf(entry.getValue().getName()) < 0) {
                 columnStatistics.put(entry.getKey(), ColumnStatistic.unknown());
+            } else {
+                columnStatistics.put(entry.getKey(), fileStats.fillColumnStats(entry.getValue()));
             }
-
-            columnStatistics.put(entry.getKey(), fileStats.fillColumnStats(entry.getValue()));
         }
 
         return columnStatistics;

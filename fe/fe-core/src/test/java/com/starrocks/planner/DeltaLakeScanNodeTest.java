@@ -14,16 +14,21 @@
 
 package com.starrocks.planner;
 
+import com.starrocks.analysis.DescriptorTable;
+import com.starrocks.analysis.SlotDescriptor;
 import com.starrocks.analysis.TupleDescriptor;
 import com.starrocks.analysis.TupleId;
+import com.starrocks.catalog.Column;
 import com.starrocks.catalog.DeltaLakeTable;
 import com.starrocks.catalog.Table;
+import com.starrocks.catalog.Type;
 import com.starrocks.common.jmockit.Deencapsulation;
 import com.starrocks.connector.CatalogConnector;
 import com.starrocks.connector.GetRemoteFilesParams;
 import com.starrocks.connector.RemoteFileInfo;
 import com.starrocks.connector.RemoteFileInfoDefaultSource;
 import com.starrocks.connector.RemoteFileInfoSource;
+import com.starrocks.connector.RemoteFilesSampleStrategy;
 import com.starrocks.connector.TableVersionRange;
 import com.starrocks.connector.delta.DeltaConnectorScanRangeSource;
 import com.starrocks.connector.delta.DeltaLakeEngine;
@@ -32,8 +37,11 @@ import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.credential.CloudConfigurationFactory;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.server.MetadataMgr;
+import com.starrocks.sql.optimizer.ScanOptimizeOption;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.thrift.TExplainLevel;
+import com.starrocks.thrift.TPlanNode;
+import com.starrocks.thrift.TScanRangeLocations;
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.internal.SnapshotImpl;
 import io.delta.kernel.internal.actions.Format;
@@ -50,6 +58,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -259,6 +268,46 @@ public class DeltaLakeScanNodeTest {
         desc.setTable(table);
         DeltaLakeScanNode scanNode = new DeltaLakeScanNode(new PlanNodeId(0), desc, "Delta Scan Node", null, null, null);
         Assertions.assertNotNull(scanNode);
+    }
+
+    @Test
+    public void testToThriftMarksRowCommitVersionDefaultSlot(@Mocked DeltaLakeTable table) {
+        DescriptorTable descTable = new DescriptorTable();
+        TupleDescriptor desc = descTable.createTupleDescriptor();
+        desc.setTable(table);
+        SlotDescriptor defaultSlot = descTable.addSlotDescriptor(desc);
+        defaultSlot.setColumn(new Column(DeltaLakeTable.ROW_COMMIT_VERSION_DEFAULT_COLUMN, Type.BIGINT));
+        defaultSlot.setType(Type.BIGINT);
+        SlotDescriptor dataSlot = descTable.addSlotDescriptor(desc);
+        dataSlot.setColumn(new Column("id", Type.BIGINT));
+        dataSlot.setType(Type.BIGINT);
+
+        DeltaLakeScanNode scanNode = new DeltaLakeScanNode(new PlanNodeId(0), desc, "Delta Scan Node", null, null, null);
+        scanNode.setScanOptimizeOption(new ScanOptimizeOption());
+        TPlanNode planNode = new TPlanNode();
+
+        scanNode.toThrift(planNode);
+
+        Assertions.assertEquals(List.of(defaultSlot.getId().asInt()),
+                planNode.getHdfs_scan_node().getExtended_slot_ids());
+    }
+
+    @Test
+    public void testToThriftWithoutRowCommitVersionSlot(@Mocked DeltaLakeTable table) {
+        DescriptorTable descTable = new DescriptorTable();
+        TupleDescriptor desc = descTable.createTupleDescriptor();
+        desc.setTable(table);
+        SlotDescriptor dataSlot = descTable.addSlotDescriptor(desc);
+        dataSlot.setColumn(new Column("id", Type.BIGINT));
+        dataSlot.setType(Type.BIGINT);
+
+        DeltaLakeScanNode scanNode = new DeltaLakeScanNode(new PlanNodeId(0), desc, "Delta Scan Node", null, null, null);
+        scanNode.setScanOptimizeOption(new ScanOptimizeOption());
+        TPlanNode planNode = new TPlanNode();
+
+        scanNode.toThrift(planNode);
+
+        Assertions.assertFalse(planNode.getHdfs_scan_node().isSetExtended_slot_ids());
     }
 
     private static Stream<Arguments> scanRangeSourceVersionCases() {

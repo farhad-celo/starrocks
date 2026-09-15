@@ -55,6 +55,10 @@ public class ScanFileUtilsTest {
     }
 
     private static Row buildScanFileRow(String addPath, String tableRoot) {
+        return buildScanFileRow(addPath, tableRoot, null);
+    }
+
+    private static Row buildScanFileRow(String addPath, String tableRoot, Long defaultRowCommitVersion) {
         Map<Integer, Object> addValues = new HashMap<>();
         if (addPath != null) {
             addValues.put(ADD_FILE_SCHEMA.indexOf("path"), addPath);
@@ -63,6 +67,9 @@ public class ScanFileUtilsTest {
         addValues.put(ADD_FILE_SCHEMA.indexOf("modificationTime"), 1L);
         addValues.put(ADD_FILE_SCHEMA.indexOf("partitionValues"),
                 VectorUtils.stringStringMapValue(new HashMap<>()));
+        if (defaultRowCommitVersion != null) {
+            addValues.put(ADD_FILE_SCHEMA.indexOf("defaultRowCommitVersion"), defaultRowCommitVersion);
+        }
         Row addRow = new GenericRow(ADD_FILE_SCHEMA, addValues);
 
         Map<Integer, Object> scanValues = new HashMap<>();
@@ -83,6 +90,16 @@ public class ScanFileUtilsTest {
         Assertions.assertEquals(
                 "oss://bucket/db/t/col_timestamp=2023-01-01%2001%3A01%3A01/part-00000.snappy.parquet", path);
         Assertions.assertNotEquals(InternalScanFileUtils.getAddFileStatus(scanFileRow).getPath(), path);
+    }
+
+    @Test
+    public void testConvertPreservesDefaultRowCommitVersion() {
+        Row scanFileRow = buildScanFileRow("part-00000.snappy.parquet", "oss://bucket/db/t", 77L);
+
+        Pair<FileScanTask, DeltaLakeAddFileStatsSerDe> result =
+                ScanFileUtils.convertFromRowToFileScanTask(false, scanFileRow, metadata, 1, null);
+
+        Assertions.assertEquals(Long.valueOf(77L), result.first.getDefaultRowCommitVersion());
     }
 
     @Test

@@ -136,15 +136,20 @@ public class ScanFileUtils {
         }
 
         Row addFileRow = getAddFileEntry(file);
+        // Read from the scan-file row, not the nested add entry.
+        Long defaultRowCommitVersion =
+                InternalScanFileUtils.getDefaultRowCommitVersion(file).orElse(null);
         FileScanTask fileScanTask;
         if (needStats) {
             DeltaLakeAddFileStatsSerDe stats = ScanFileUtils.getColumnStatistics(
                     addFileRow, fileStatus, estimateRowSize);
-            fileScanTask = new FileScanTask(fileStatus, stats.numRecords, logicalPartitionValues, dv);
+            fileScanTask = new FileScanTask(fileStatus, stats.numRecords, logicalPartitionValues, dv,
+                    defaultRowCommitVersion);
             return new Pair<>(fileScanTask, stats);
         } else {
             long records = ScanFileUtils.getFileRows(addFileRow, fileStatus, estimateRowSize);
-            fileScanTask = new FileScanTask(fileStatus, records, logicalPartitionValues, dv);
+            fileScanTask = new FileScanTask(fileStatus, records, logicalPartitionValues, dv,
+                    defaultRowCommitVersion);
             return new Pair<>(fileScanTask, null);
         }
     }

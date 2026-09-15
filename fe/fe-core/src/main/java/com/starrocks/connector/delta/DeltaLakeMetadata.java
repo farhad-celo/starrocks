@@ -391,11 +391,15 @@ public class DeltaLakeMetadata implements ConnectorMetadata {
         Set<String> nonPartitionPrimitiveColumns;
         Set<String> partitionPrimitiveColumns;
         if (fieldNames != null) {
+            // Skip non-schema columns (e.g. the hidden _row_commit_version) so schema.get can't fail on them.
+            Set<String> schemaFieldNames = new HashSet<>(schema.fieldNames());
             nonPartitionPrimitiveColumns = fieldNames.stream()
+                    .filter(schemaFieldNames::contains)
                     .filter(column -> DeltaDataType.canUseStatsType(schema.get(column).getDataType())
                             && !partitionColumns.contains(column))
                     .collect(Collectors.toSet());
             partitionPrimitiveColumns = fieldNames.stream()
+                    .filter(schemaFieldNames::contains)
                     .filter(column -> DeltaDataType.canUseStatsType(schema.get(column).getDataType())
                             && partitionColumns.contains(column))
                     .collect(Collectors.toSet());

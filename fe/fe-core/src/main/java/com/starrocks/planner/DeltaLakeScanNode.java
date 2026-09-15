@@ -29,6 +29,7 @@ import com.starrocks.connector.RemoteFileInfoSource;
 import com.starrocks.connector.RemoteFilesSampleStrategy;
 import com.starrocks.connector.TableVersionRange;
 import com.starrocks.connector.delta.DeltaConnectorScanRangeSource;
+import com.starrocks.connector.delta.DeltaRowTrackingUtils;
 import com.starrocks.connector.delta.DeltaUtils;
 import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.server.GlobalStateMgr;
@@ -153,7 +154,8 @@ public class DeltaLakeScanNode extends ScanNode {
             remoteFileInfoSource = new RemoteFileInfoDefaultSource(
                     GlobalStateMgr.getCurrentState().getMetadataMgr().getRemoteFiles(deltaLakeTable, params));
         }
-        scanRangeSource = new DeltaConnectorScanRangeSource(deltaLakeTable, remoteFileInfoSource, partitionIdGenerator);
+        scanRangeSource = new DeltaConnectorScanRangeSource(deltaLakeTable, remoteFileInfoSource,
+                partitionIdGenerator, desc);
     }
 
     @Override
@@ -243,6 +245,8 @@ public class DeltaLakeScanNode extends ScanNode {
         HdfsScanNode.setMinMaxConjunctsToThrift(tHdfsScanNode, this, this.getScanNodePredicates());
         HdfsScanNode.setPartitionConjunctsToThrift(tHdfsScanNode, this, this.getScanNodePredicates());
         HdfsScanNode.setDataCacheOptionsToThrift(tHdfsScanNode, dataCacheOptions);
+        // Mark the $row_commit_version default slots as per-file constants, not parquet reads.
+        DeltaRowTrackingUtils.setRowCommitVersionExtendedSlotIds(tHdfsScanNode, desc);
     }
 
     @Override

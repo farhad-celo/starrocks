@@ -14,6 +14,7 @@
 package com.starrocks.connector.delta;
 
 import com.starrocks.analysis.DescriptorTable;
+import com.starrocks.analysis.TupleDescriptor;
 import com.starrocks.catalog.DeltaLakeTable;
 import com.starrocks.catalog.PartitionKey;
 import com.starrocks.common.AnalysisException;
@@ -45,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.starrocks.common.profile.Tracers.Module.EXTERNAL;
+import static com.starrocks.connector.delta.DeltaRowTrackingUtils.setRowCommitVersionExtendedColumn;
 
 public class DeltaConnectorScanRangeSource extends ConnectorScanRangeSource {
     private static final Logger LOG = LogManager.getLogger(DeltaConnectorScanRangeSource.class);
@@ -52,16 +54,25 @@ public class DeltaConnectorScanRangeSource extends ConnectorScanRangeSource {
     private final RemoteFileInfoSource remoteFileInfoSource;
     private final RemoteFileInputFormat remoteFileInputFormat;
     private final PartitionIdGenerator partitionIdGenerator;
+    // Scan node tuple descriptor; may be null. Extended columns are emitted per file only when it
+    // contains the $row_commit_version$default slot (i.e. the query references $row_commit_version).
+    private final TupleDescriptor desc;
 
     private Map<PartitionKey, Long> partitionKeys = new HashMap<>();
     private Map<Long, DescriptorTable.ReferencedPartitionInfo> referencedPartitions = new HashMap<>();
 
     public DeltaConnectorScanRangeSource(DeltaLakeTable table, RemoteFileInfoSource remoteFileInfoSource,
                                          PartitionIdGenerator partitionIdGenerator) {
+        this(table, remoteFileInfoSource, partitionIdGenerator, null);
+    }
+
+    public DeltaConnectorScanRangeSource(DeltaLakeTable table, RemoteFileInfoSource remoteFileInfoSource,
+                                         PartitionIdGenerator partitionIdGenerator, TupleDescriptor desc) {
         this.table = table;
         this.remoteFileInfoSource = remoteFileInfoSource;
         this.remoteFileInputFormat = DeltaUtils.getRemoteFileFormat(table.getDeltaMetadata().getFormat().getProvider());
         this.partitionIdGenerator = partitionIdGenerator;
+        this.desc = desc;
     }
 
     private long addPartition(FileScanTask fileScanTask) throws AnalysisException {
@@ -121,6 +132,7 @@ public class DeltaConnectorScanRangeSource extends ConnectorScanRangeSource {
             dv.setCardinality(fileScanTask.getDv().getCardinality());
             hdfsScanRange.setDeletion_vector_descriptor(dv);
         }
+        setRowCommitVersionExtendedColumn(hdfsScanRange, fileScanTask, desc);
 
         TScanRange scanRange = new TScanRange();
         scanRange.setHdfs_scan_range(hdfsScanRange);
