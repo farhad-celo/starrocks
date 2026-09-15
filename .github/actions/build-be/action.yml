@@ -8,7 +8,7 @@ inputs:
   branch:
     required: false
   oci_version:
-    description: OCI version label for the single-architecture image.
+    description: OCI version metadata for the single-architecture image.
     required: false
     default: ''
   to_push:
@@ -39,32 +39,46 @@ runs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Build and push BE image
       shell: bash
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         OCI_VERSION: ${{ inputs.oci_version }}
       run: |
-        # Registry pushes can fail transiently, for example when GHCR returns "unknown blob".
-        push_with_retry() {
-          local image="$1"
+        # Registry exports can fail transiently, for example when GHCR returns "unknown blob".
+        build_and_push_with_retry() {
           local max_attempts=5
           local delay_seconds=5
           local attempt
+          local -a cache_options=(--no-cache)
 
           for ((attempt = 1; attempt <= max_attempts; attempt++)); do
-            if docker push "${image}"; then
+            if docker buildx build "${cache_options[@]}" \
+              --build-arg RUN_AS_USER=starrocks \
+              --build-arg ARTIFACTIMAGE="$ARTIFACT_IMAGE" \
+              "${oci_labels[@]}" \
+              "${oci_annotations[@]}" \
+              -f "${{ inputs.be_dockerfile }}" \
+              -t "ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}" \
+              -t "${ECR_REGISTRY}/celostar/starrocks-be:${IMAGE_TAG}" \
+              --provenance=false \
+              --push .; then
               return 0
             fi
 
             if ((attempt == max_attempts)); then
-              echo "::error::Failed to push ${image} after ${max_attempts} attempts"
+              echo "::error::Failed to build and push BE image after ${max_attempts} attempts"
               return 1
             fi
 
-            echo "Push attempt ${attempt}/${max_attempts} failed for ${image}; retrying in ${delay_seconds}s"
+            echo "Build and push attempt ${attempt}/${max_attempts} failed; retrying in ${delay_seconds}s"
             sleep "${delay_seconds}"
             delay_seconds=$((delay_seconds * 2))
+            # Reuse the successful build layers if only the registry export failed.
+            cache_options=()
           done
         }
 
@@ -75,8 +89,13 @@ runs:
           --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
           --label "org.opencontainers.image.revision=${GITHUB_SHA}"
         )
+        oci_annotations=(
+          --annotation "manifest:org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          --annotation "manifest:org.opencontainers.image.revision=${GITHUB_SHA}"
+        )
         if [[ -n "${OCI_VERSION}" ]]; then
           oci_labels+=(--label "org.opencontainers.image.version=${OCI_VERSION}")
+          oci_annotations+=(--annotation "manifest:org.opencontainers.image.version=${OCI_VERSION}")
         fi
 
         if [ -n "${{ inputs.branch }}" ]; then
@@ -84,13 +103,4 @@ runs:
           git checkout ${{ inputs.branch }}
         fi
 
-        docker build --no-cache \
-          --build-arg RUN_AS_USER=starrocks \
-          --build-arg ARTIFACTIMAGE=$ARTIFACT_IMAGE \
-          "${oci_labels[@]}" \
-          -f ${{ inputs.be_dockerfile }} \
-          -t ghcr.io/celonis/celostar/starrocks-be:$IMAGE_TAG \
-          -t ${ECR_REGISTRY}/celostar/starrocks-be:$IMAGE_TAG .
-
-        push_with_retry "ghcr.io/celonis/celostar/starrocks-be:${IMAGE_TAG}"
-        push_with_retry "${ECR_REGISTRY}/celostar/starrocks-be:${IMAGE_TAG}"
+        build_and_push_with_retry
