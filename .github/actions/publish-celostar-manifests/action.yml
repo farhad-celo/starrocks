@@ -1,7 +1,7 @@
 name: Publish Celostar multi-arch image manifests
 description: >-
   Creates and pushes manifest lists for starrocks-be, starrocks-fe (ECR + GHCR)
-  and starrocks-allin1 (GHCR) from per-arch tags.
+  and starrocks-allin1 (ECR + GHCR) from per-arch tags.
 
 inputs:
   tag_arm:
@@ -11,7 +11,7 @@ inputs:
     description: Image tag for the amd64 single-arch image.
     required: true
   tag_combined:
-    description: Multi-arch manifest tag (allin1 + FE + BE use this on GHCR; FE/BE on ECR).
+    description: Multi-arch manifest tag (allin1 + FE + BE use this on ECR and GHCR).
     required: true
   celostar_docker_tag:
     description: >-
@@ -29,7 +29,7 @@ inputs:
     required: false
     default: 'true'
   publish_allin1:
-    description: Publish starrocks-allin1 multi-arch manifest (GHCR).
+    description: Publish starrocks-allin1 multi-arch manifests (ECR + GHCR).
     required: false
     default: 'true'
 
@@ -53,57 +53,47 @@ runs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: GHCR — starrocks-allin1 manifest
+    - name: ECR + GHCR — starrocks-allin1 manifests
       if: ${{ inputs.publish_allin1 == 'true' }}
       shell: bash
       env:
-        ARM_IMAGE_TAG: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_arm }}
-        X86_IMAGE_TAG: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_x86 }}
-        MULTI_ARCH_IMAGE_TAG: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_combined }}
-        OCI_VERSION: ${{ inputs.celostar_docker_tag }}
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        TAG_ARM: ${{ inputs.tag_arm }}
+        TAG_X86: ${{ inputs.tag_x86 }}
+        TAG_MULTI: ${{ inputs.tag_combined }}
+        CELOSTAR_DOCKER_TAG: ${{ inputs.celostar_docker_tag }}
       run: |
         set -euo pipefail
         annotations=(
           --annotation "index:org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
           --annotation "index:org.opencontainers.image.revision=${GITHUB_SHA}"
         )
-        if [[ -n "${OCI_VERSION}" ]]; then
+        if [[ -n "${CELOSTAR_DOCKER_TAG}" ]]; then
           annotations+=(
-            --annotation "index:org.opencontainers.image.version=${OCI_VERSION}"
-            --annotation "manifest-descriptor[linux/arm64]:org.opencontainers.image.version=${OCI_VERSION}-arm"
-            --annotation "manifest-descriptor[linux/amd64]:org.opencontainers.image.version=${OCI_VERSION}-amd"
+            --annotation "index:org.opencontainers.image.version=${CELOSTAR_DOCKER_TAG}"
+            --annotation "manifest-descriptor[linux/arm64]:org.opencontainers.image.version=${CELOSTAR_DOCKER_TAG}-arm"
+            --annotation "manifest-descriptor[linux/amd64]:org.opencontainers.image.version=${CELOSTAR_DOCKER_TAG}-amd"
           )
         fi
 
-        docker buildx imagetools create \
-          "${annotations[@]}" \
-          --tag "${MULTI_ARCH_IMAGE_TAG}" \
-          "${ARM_IMAGE_TAG}" \
-          "${X86_IMAGE_TAG}"
-
-    - name: GHCR — starrocks-allin1 Celostar manifest
-      if: ${{ inputs.publish_allin1 == 'true' && inputs.celostar_docker_tag != '' }}
-      shell: bash
-      env:
-        ARM_IMAGE_TAG: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_arm }}
-        X86_IMAGE_TAG: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.tag_x86 }}
-        MULTI_ARCH_IMAGE_TAG: ghcr.io/celonis/celostar/starrocks-allin1:${{ inputs.celostar_docker_tag }}
-        OCI_VERSION: ${{ inputs.celostar_docker_tag }}
-      run: |
-        set -euo pipefail
-        annotations=(
-          --annotation "index:org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
-          --annotation "index:org.opencontainers.image.revision=${GITHUB_SHA}"
-          --annotation "index:org.opencontainers.image.version=${OCI_VERSION}"
-          --annotation "manifest-descriptor[linux/arm64]:org.opencontainers.image.version=${OCI_VERSION}-arm"
-          --annotation "manifest-descriptor[linux/amd64]:org.opencontainers.image.version=${OCI_VERSION}-amd"
+        registries=(
+          "${ECR_REGISTRY}/celostar"
+          "ghcr.io/celonis/celostar"
         )
 
-        docker buildx imagetools create \
-          "${annotations[@]}" \
-          --tag "${MULTI_ARCH_IMAGE_TAG}" \
-          "${ARM_IMAGE_TAG}" \
-          "${X86_IMAGE_TAG}"
+        for registry in "${registries[@]}"; do
+          image="${registry}/starrocks-allin1"
+          output_tags=(--tag "${image}:${TAG_MULTI}")
+          if [[ -n "${CELOSTAR_DOCKER_TAG}" ]]; then
+            output_tags+=(--tag "${image}:${CELOSTAR_DOCKER_TAG}")
+          fi
+
+          docker buildx imagetools create \
+            "${annotations[@]}" \
+            "${output_tags[@]}" \
+            "${image}:${TAG_ARM}" \
+            "${image}:${TAG_X86}"
+        done
 
     - name: ECR + GHCR — starrocks-be + starrocks-fe manifests
       if: ${{ inputs.publish_be == 'true' || inputs.publish_fe == 'true' }}
