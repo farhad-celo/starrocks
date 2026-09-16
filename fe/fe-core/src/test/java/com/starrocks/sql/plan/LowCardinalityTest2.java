@@ -304,7 +304,8 @@ public class LowCardinalityTest2 extends PlanTestBase {
                 "cte2 as (\n" +
                 "select P_COMMENT from part where P_TYPE = \"AAAA\"\n" +
                 ")\n" +
-                "select cte1.L_SHIPMODE, cte1.L_COMMENT from cte1 join[broadcast] cte2 on cte1.L_SHIPMODE = cte2.P_COMMENT";
+                "select /*+SET_VAR(enable_low_cardinality_optimize_for_union_all=false)*/ " +
+                "cte1.L_SHIPMODE, cte1.L_COMMENT from cte1 join[broadcast] cte2 on cte1.L_SHIPMODE = cte2.P_COMMENT";
 
         String plan = getVerboseExplain(sql);
         Assertions.assertTrue(plan.contains("  4:Decode\n" +
