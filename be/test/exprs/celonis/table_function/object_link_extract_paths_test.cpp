@@ -6,6 +6,7 @@
 
 #include "../util.h"
 #include "column/column_helper.h"
+#include "column/const_column.h"
 #include "exprs/anyval_util.h"
 #include "testutil/assert.h"
 
@@ -24,13 +25,16 @@ protected:
     }
 
     template <LogicalType LT>
-    static std::tuple<TableFunctionState*, std::unique_ptr<TableFunction>> Prepare(
+    static Columns BuildArrayLayoutColumns(
             const std::vector<std::vector<std::optional<RunTimeCppType<LT>>>>& adj_matrix,
             const std::optional<std::vector<std::optional<RunTimeCppType<LT>>>>& start_vec = std::nullopt,
             const std::optional<std::vector<std::optional<RunTimeCppType<LT>>>>& end_vec = std::nullopt,
             const std::optional<std::vector<std::vector<std::optional<RunTimeCppType<LT>>>>>& constraints =
                     std::nullopt,
-            const std::optional<std::string>& config_str = std::nullopt) {
+            const std::optional<std::string>& config_str = std::nullopt,
+            const std::optional<std::vector<std::vector<std::optional<RunTimeCppType<LT>>>>>& visited_nodes =
+                    std::nullopt,
+            const bool pass_visited_nodes = false) {
         auto neighbors_offsets = UInt32Column::create();
         neighbors_offsets->append(0);
         auto neighbors = NullableColumn::create(RunTimeColumnType<LT>::create(), NullColumn::create());
@@ -99,7 +103,6 @@ protected:
 
         ColumnPtr constraints_column;
         if (!constraints.has_value()) {
-            // Null constraint column to test handling of NULLs directly
             auto outer_nulls = NullColumn::create();
             outer_nulls->append(1);
 
@@ -157,7 +160,6 @@ protected:
             str_nulls->append(0);
             input.push_back(NullableColumn::create(std::move(str_elements), std::move(str_nulls)));
         } else {
-            // Null string column to test handling of NULLs directly
             auto str_elements = BinaryColumn::create();
             auto str_nulls = NullColumn::create();
             str_elements->append("");
@@ -165,11 +167,120 @@ protected:
             input.push_back(NullableColumn::create(std::move(str_elements), std::move(str_nulls)));
         }
 
+        if (visited_nodes.has_value()) {
+            auto v_neighbors_offsets = UInt32Column::create();
+            v_neighbors_offsets->append(0);
+            auto v_neighbors = NullableColumn::create(RunTimeColumnType<LT>::create(), NullColumn::create());
+            auto v_current_offset = 0U;
+
+            for (const auto& outer : visited_nodes.value()) {
+                for (const auto& elem : outer) {
+                    if (elem.has_value()) {
+                        v_neighbors->append_datum(elem.value());
+                    } else {
+                        v_neighbors->append_nulls(1);
+                    }
+                    v_current_offset++;
+                }
+                v_neighbors_offsets->append(v_current_offset);
+            }
+
+            auto v_neighbors_column = ArrayColumn::create(v_neighbors, v_neighbors_offsets);
+            auto v_top_offsets = UInt32Column::create();
+            v_top_offsets->append(0);
+            v_top_offsets->append(visited_nodes.value().size());
+            auto v_inner_nulls = NullColumn::create();
+            v_inner_nulls->append_default(visited_nodes.value().size());
+            auto v_final_nulls = NullColumn::create();
+            v_final_nulls->append(0);
+            input.push_back(NullableColumn::create(
+                    ArrayColumn::create(NullableColumn::create(v_neighbors_column, std::move(v_inner_nulls)),
+                                        std::move(v_top_offsets)),
+                    std::move(v_final_nulls)));
+        } else if (pass_visited_nodes) {
+            auto v_final_nulls = NullColumn::create();
+            v_final_nulls->append(1);
+
+            auto v_neighbors = NullableColumn::create(RunTimeColumnType<LT>::create(), NullColumn::create());
+            auto v_neighbors_column = ArrayColumn::create(std::move(v_neighbors), UInt32Column::create());
+            auto v_inner_nulls = NullColumn::create(v_neighbors_column->size(), 0);
+            auto v_top_offsets = UInt32Column::create();
+            v_top_offsets->append(0);
+            v_top_offsets->append(0);
+
+            input.push_back(NullableColumn::create(
+                    ArrayColumn::create(NullableColumn::create(std::move(v_neighbors_column), std::move(v_inner_nulls)),
+                                        std::move(v_top_offsets)),
+                    std::move(v_final_nulls)));
+        }
+
+        return input;
+    }
+
+    template <LogicalType LT>
+    static std::tuple<TableFunctionState*, std::unique_ptr<TableFunction>> Prepare(
+            const std::vector<std::vector<std::optional<RunTimeCppType<LT>>>>& adj_matrix,
+            const std::optional<std::vector<std::optional<RunTimeCppType<LT>>>>& start_vec = std::nullopt,
+            const std::optional<std::vector<std::optional<RunTimeCppType<LT>>>>& end_vec = std::nullopt,
+            const std::optional<std::vector<std::vector<std::optional<RunTimeCppType<LT>>>>>& constraints =
+                    std::nullopt,
+            const std::optional<std::string>& config_str = std::nullopt,
+            const std::optional<std::vector<std::vector<std::optional<RunTimeCppType<LT>>>>>& visited_nodes =
+                    std::nullopt,
+            const bool expanded_output = true) {
+        return BuildArrayLayoutState(
+                BuildArrayLayoutColumns<LT>(adj_matrix, start_vec, end_vec, constraints, config_str, visited_nodes),
+                expanded_output);
+    }
+
+    struct ArrayLayoutRow {
+        std::vector<std::vector<std::optional<int64_t>>> adj_matrix;
+        std::optional<std::vector<std::optional<int64_t>>> start_nodes = std::nullopt;
+        std::optional<std::vector<std::optional<int64_t>>> end_nodes = std::nullopt;
+        std::optional<std::vector<std::vector<std::optional<int64_t>>>> constraints = std::nullopt;
+        std::optional<std::string> config_str = std::nullopt;
+        std::optional<std::vector<std::vector<std::optional<int64_t>>>> visited_nodes = std::nullopt;
+    };
+
+    static std::tuple<TableFunctionState*, std::unique_ptr<TableFunction>> PrepareArrayRows(
+            const std::vector<ArrayLayoutRow>& rows, const bool pass_visited_nodes = false) {
+        const bool with_visited_nodes =
+                pass_visited_nodes || std::any_of(rows.begin(), rows.end(), [](const ArrayLayoutRow& row) {
+                    return row.visited_nodes.has_value();
+                });
+
+        std::vector<MutableColumnPtr> merged;
+        for (const auto& row : rows) {
+            Columns row_columns = BuildArrayLayoutColumns<TYPE_BIGINT>(row.adj_matrix, row.start_nodes, row.end_nodes,
+                                                                       row.constraints, row.config_str,
+                                                                       row.visited_nodes, with_visited_nodes);
+            if (merged.empty()) {
+                for (const auto& column : row_columns) {
+                    merged.push_back(column->clone());
+                }
+                continue;
+            }
+            EXPECT_EQ(merged.size(), row_columns.size()) << "Every row has to pass the same arguments";
+            for (size_t i = 0; i < row_columns.size(); i++) {
+                merged[i]->append(*row_columns[i], 0, 1);
+            }
+        }
+
+        Columns input;
+        input.reserve(merged.size());
+        for (auto& column : merged) {
+            input.emplace_back(std::move(column));
+        }
+        return BuildArrayLayoutState(std::move(input));
+    }
+
+    static std::tuple<TableFunctionState*, std::unique_ptr<TableFunction>> BuildArrayLayoutState(
+            Columns input, const bool expanded_output = true) {
         TableFunctionState* table_state;
-        auto function = std::make_unique<CelonisObjectLinkExtractPaths>();
+        auto function = std::make_unique<CelonisObjectLinkExtractPaths>(/*row_per_start_node=*/false, expanded_output);
 
         EXPECT_OK(function->init({}, &table_state));
-        table_state->set_params(input);
+        table_state->set_params(std::move(input));
         EXPECT_OK(function->prepare(table_state));
 
         return {table_state, std::move(function)};
@@ -196,7 +307,6 @@ protected:
         }
     }
 
-    // Extracts the emitted paths so that tests can compare them order-independently.
     template <LogicalType LT>
     static std::vector<std::vector<RunTimeCppType<LT>>> CollectPaths(const ColumnPtr& result_column) {
         auto array_col = down_cast<const ArrayColumn*>(result_column.get());
@@ -213,6 +323,145 @@ protected:
             paths.push_back(std::move(path));
         }
         return paths;
+    }
+
+    static std::vector<int64_t> CollectPathLengths(const ColumnPtr& result_column) {
+        auto* col = down_cast<const Int64Column*>(result_column.get());
+        return {col->get_data().begin(), col->get_data().end()};
+    }
+
+    static std::vector<std::optional<int64_t>> CollectResumeNodes(const ColumnPtr& result_column) {
+        auto* nullable_col = down_cast<const NullableColumn*>(result_column.get());
+        auto* data_col = down_cast<const Int64Column*>(nullable_col->data_column().get());
+        std::vector<std::optional<int64_t>> result;
+        result.reserve(nullable_col->size());
+        for (size_t i = 0; i < nullable_col->size(); i++) {
+            if (nullable_col->is_null(i)) {
+                result.push_back(std::nullopt);
+            } else {
+                result.push_back(data_col->get_data()[i]);
+            }
+        }
+        return result;
+    }
+
+    struct StartNodeRow {
+        std::vector<std::vector<std::optional<int64_t>>> adj_matrix;
+        std::optional<int64_t> start_node;
+        std::vector<std::optional<int64_t>> end_nodes;
+        std::optional<std::vector<std::vector<std::optional<int64_t>>>> constraints = std::nullopt;
+        std::optional<std::vector<std::optional<int64_t>>> visited_nodes = std::nullopt;
+    };
+
+    static std::tuple<TableFunctionState*, std::unique_ptr<TableFunction>> PrepareRows(
+            const std::vector<StartNodeRow>& rows, const std::optional<std::string>& config_str = std::nullopt,
+            const bool pass_visited_nodes = false) {
+        auto build_matrix_column = [&rows](auto&& get) -> ColumnPtr {
+            auto adjacency_offsets = UInt32Column::create();
+            adjacency_offsets->append(0);
+            auto neighbors = NullableColumn::create(Int64Column::create(), NullColumn::create());
+            auto row_offsets = UInt32Column::create();
+            row_offsets->append(0);
+            auto row_nulls = NullColumn::create();
+
+            uint32_t neighbor_count = 0;
+            uint32_t adjacency_count = 0;
+            for (const auto& row : rows) {
+                const auto* matrix = get(row);
+                if (matrix == nullptr) {
+                    row_nulls->append(1);
+                } else {
+                    for (const auto& adjacency : *matrix) {
+                        for (const auto& node_id : adjacency) {
+                            if (node_id.has_value()) {
+                                neighbors->append_datum(node_id.value());
+                            } else {
+                                neighbors->append_nulls(1);
+                            }
+                            neighbor_count++;
+                        }
+                        adjacency_offsets->append(neighbor_count);
+                        adjacency_count++;
+                    }
+                    row_nulls->append(0);
+                }
+                row_offsets->append(adjacency_count);
+            }
+
+            auto adjacency_lists = ArrayColumn::create(std::move(neighbors), std::move(adjacency_offsets));
+            auto adjacency_nulls = NullColumn::create(adjacency_count, 0);
+            return NullableColumn::create(
+                    ArrayColumn::create(NullableColumn::create(std::move(adjacency_lists), std::move(adjacency_nulls)),
+                                        std::move(row_offsets)),
+                    std::move(row_nulls));
+        };
+
+        auto build_array_column = [&rows](auto&& get) -> ColumnPtr {
+            auto offsets = UInt32Column::create();
+            offsets->append(0);
+            auto elements = NullableColumn::create(Int64Column::create(), NullColumn::create());
+            auto nulls = NullColumn::create();
+
+            uint32_t element_count = 0;
+            for (const auto& row : rows) {
+                const auto* values = get(row);
+                if (values == nullptr) {
+                    nulls->append(1);
+                } else {
+                    for (const auto& value : *values) {
+                        if (value.has_value()) {
+                            elements->append_datum(value.value());
+                        } else {
+                            elements->append_nulls(1);
+                        }
+                        element_count++;
+                    }
+                    nulls->append(0);
+                }
+                offsets->append(element_count);
+            }
+            return NullableColumn::create(ArrayColumn::create(std::move(elements), std::move(offsets)),
+                                          std::move(nulls));
+        };
+
+        auto start_nodes = NullableColumn::create(Int64Column::create(), NullColumn::create());
+        auto config_elements = BinaryColumn::create();
+        auto config_nulls = NullColumn::create();
+        for (const auto& row : rows) {
+            if (row.start_node.has_value()) {
+                start_nodes->append_datum(row.start_node.value());
+            } else {
+                start_nodes->append_nulls(1);
+            }
+            config_elements->append(config_str.value_or(""));
+            config_nulls->append(config_str.has_value() ? 0 : 1);
+        }
+
+        Columns input = {build_matrix_column([](const StartNodeRow& row) { return &row.adj_matrix; }),
+                         std::move(start_nodes),
+                         build_array_column([](const StartNodeRow& row) { return &row.end_nodes; }),
+                         build_matrix_column([](const StartNodeRow& row) {
+                             return row.constraints.has_value() ? &row.constraints.value() : nullptr;
+                         }),
+                         NullableColumn::create(std::move(config_elements), std::move(config_nulls))};
+        if (pass_visited_nodes) {
+            input.push_back(build_array_column([](const StartNodeRow& row) {
+                return row.visited_nodes.has_value() ? &row.visited_nodes.value() : nullptr;
+            }));
+        }
+
+        TableFunctionState* table_state;
+        auto function = std::make_unique<CelonisObjectLinkExtractPaths>(/*row_per_start_node=*/true);
+
+        EXPECT_OK(function->init({}, &table_state));
+        table_state->set_params(input);
+        EXPECT_OK(function->prepare(table_state));
+
+        return {table_state, std::move(function)};
+    }
+
+    static std::vector<uint32_t> CollectRowOffsets(const UInt32Column::Ptr& offsets) {
+        return {offsets->get_data().begin(), offsets->get_data().end()};
     }
 
     std::unique_ptr<RuntimeState> rt_state_;
@@ -262,6 +511,39 @@ TEST_F(CelonisObjectLinkExtractPathsTest, multiple_paths) {
     const auto [result_columns, offset] = Run(table_state, function.get());
 
     EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}});
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, path_length_and_resume_node_legacy_mode) {
+    const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1, 2}, {3}, {3}, {}}, {{0L}}, {{3L}});
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}});
+    EXPECT_EQ(CollectPathLengths(result_columns[1]), std::vector<int64_t>({3, 3}));
+    EXPECT_EQ(CollectResumeNodes(result_columns[2]), std::vector<std::optional<int64_t>>({std::nullopt, std::nullopt}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, legacy_contract_returns_only_path_column) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{1, 2}, {3}, {3}, {}}, {{0L}}, {{3L}}, std::nullopt, std::nullopt, std::nullopt,
+                                 /*expanded_output=*/false);
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EXPECT_EQ(result_columns.size(), 1);
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}});
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, legacy_contract_supports_prefix_count) {
+    const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1, 2}, {3}, {3}, {}}, {{0L}}, {{3L}}, std::nullopt,
+                                                              "N:PC2", std::nullopt, /*expanded_output=*/false);
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EXPECT_EQ(result_columns.size(), 1);
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L}, {0L, 2L}});
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
@@ -475,6 +757,34 @@ TEST_F(CelonisObjectLinkExtractPathsTest, chunked_output_multiple) {
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
+TEST_F(CelonisObjectLinkExtractPathsTest, path_length_and_resume_node_chunked_output) {
+    rt_state_->set_chunk_size(2);
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{1, 2, 3, 5, 6}, {4}, {4}, {4}, {}, {4}, {4}}, {{0L}}, {{4L}});
+
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 1L, 4L}, {0L, 2L, 4L}});
+        EXPECT_EQ(CollectPathLengths(results[1]), std::vector<int64_t>({3, 3}));
+        EXPECT_EQ(CollectResumeNodes(results[2]), std::vector<std::optional<int64_t>>({std::nullopt, std::nullopt}));
+    }
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 3L, 4L}, {0L, 5L, 4L}});
+        EXPECT_EQ(CollectPathLengths(results[1]), std::vector<int64_t>({3, 3}));
+        EXPECT_EQ(CollectResumeNodes(results[2]), std::vector<std::optional<int64_t>>({std::nullopt, std::nullopt}));
+    }
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 6L, 4L}});
+        EXPECT_EQ(CollectPathLengths(results[1]), std::vector<int64_t>({3}));
+        EXPECT_EQ(CollectResumeNodes(results[2]), std::vector<std::optional<int64_t>>({std::nullopt}));
+        EXPECT_EQ(table_state->processed_rows(), 1);
+    }
+
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
 // Graph Representation:
 //        +--> 1 ---> 3
 //        |
@@ -542,7 +852,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, chunked_output_deep_backtracking) {
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
-// Helper graph generator used by length tests.
 // Graph Representation:
 //        +--> [1..10] -----------------+
 //        |                             |
@@ -569,7 +878,6 @@ std::vector<std::vector<std::optional<int64_t>>> BuildLengthTestGraph() {
     return adj_matrix;
 }
 
-// (See BuildLengthTestGraph for representation)
 TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_less_equal_pruning) {
     auto adj_matrix = BuildLengthTestGraph();
 
@@ -585,8 +893,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_less_equal_pruning) {
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
-// Older callers always appended a trailing ":0" placeholder after single-value length
-// comparisons (e.g. "N:LE:3:0"). The parser must keep accepting and ignoring it.
 TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_less_equal_legacy_trailing_zero) {
     auto adj_matrix = BuildLengthTestGraph();
 
@@ -602,7 +908,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_less_equal_legacy_tra
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
-// (See BuildLengthTestGraph for representation)
 TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_equal_pruning) {
     auto adj_matrix = BuildLengthTestGraph();
 
@@ -618,7 +923,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_equal_pruning) {
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
-// (See BuildLengthTestGraph for representation)
 TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_between_pruning) {
     auto adj_matrix = BuildLengthTestGraph();
 
@@ -637,7 +941,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_between_pruning) {
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
-// (See BuildLengthTestGraph for representation)
 TEST_F(CelonisObjectLinkExtractPathsTest, length_condition_prune_all) {
     auto adj_matrix = BuildLengthTestGraph();
 
@@ -697,7 +1000,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, isolated_and_complex_cycles_combined) 
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
-// Helper graph generator used by the prefix count tests.
 // Graph Representation:
 //                     +--> 4
 //                     |
@@ -714,15 +1016,6 @@ std::vector<std::vector<std::optional<int64_t>>> BuildPrefixCountTestGraph() {
     return {{1}, {2, 3}, {4, 5}, {6, 7}, {}, {}, {}, {}};
 }
 
-// (See BuildPrefixCountTestGraph for representation)
-// Round 0 (the start node alone) and round 1 both undershoot the desired count of 4, so the search
-// keeps growing the frontier. Manual trace:
-//   round 0 frontier: [0]                            -> terminal: {},        1 row  (< 4)
-//   round 1 frontier: [0,1]                          -> terminal: {},        1 row  (< 4)
-//   round 2 frontier: [0,1,2], [0,1,3]               -> terminal: {[0,1]},   3 rows (< 4)
-//   round 3 frontier: [0,1,2,4], [0,1,2,5], [0,1,3,6], [0,1,3,7]
-//                                                    -> terminal: {[0,1]},   5 rows (>= 4, stop)
-// [0,1] was completed back in round 2 and must still show up in the final output.
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_grows_frontier_until_satisfied) {
     const auto [table_state, function] =
             Prepare<TYPE_BIGINT>(BuildPrefixCountTestGraph(), {{0L}}, {{1L}}, std::nullopt, "N:PC4");
@@ -734,8 +1027,20 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_grows_frontier_until_sati
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
-// (See BuildPrefixCountTestGraph for representation)
-// The finalized result is streamed back through the normal chunked output contract.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_marks_growing_prefixes_incomplete) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>(BuildPrefixCountTestGraph(), {{0L}}, {{1L}}, std::nullopt, "N:PC4");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0],
+                               {{0L, 1L}, {0L, 1L, 2L, 4L}, {0L, 1L, 2L, 5L}, {0L, 1L, 3L, 6L}, {0L, 1L, 3L, 7L}});
+    EXPECT_EQ(CollectPathLengths(result_columns[1]), std::vector<int64_t>({2, 4, 4, 4, 4}));
+    EXPECT_EQ(CollectResumeNodes(result_columns[2]),
+              std::vector<std::optional<int64_t>>({std::nullopt, 4L, 5L, 6L, 7L}));
+    EXPECT_EQ(table_state->processed_rows(), 1);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_chunked_output) {
     rt_state_->set_chunk_size(2);
     const auto [table_state, function] =
@@ -762,9 +1067,32 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_chunked_output) {
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
-// (See BuildLengthTestGraph for representation)
-// The completed paths are found across two different rounds and streamed out in round order, four
-// rows per call: the ten 3-node paths of round 2 first, then the five 4-node paths of round 3.
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_resume_node_survives_chunk_boundaries) {
+    rt_state_->set_chunk_size(2);
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>(BuildPrefixCountTestGraph(), {{0L}}, {{1L}}, std::nullopt, "N:PC4");
+
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 1L}, {0L, 1L, 2L, 4L}});
+        EXPECT_EQ(CollectPathLengths(results[1]), std::vector<int64_t>({2, 4}));
+        EXPECT_EQ(CollectResumeNodes(results[2]), std::vector<std::optional<int64_t>>({std::nullopt, 4L}));
+    }
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 1L, 2L, 5L}, {0L, 1L, 3L, 6L}});
+        EXPECT_EQ(CollectPathLengths(results[1]), std::vector<int64_t>({4, 4}));
+        EXPECT_EQ(CollectResumeNodes(results[2]), std::vector<std::optional<int64_t>>({5L, 6L}));
+    }
+    {
+        auto [results, offset] = function->process(rt_state_.get(), table_state);
+        EvaluatePaths<TYPE_BIGINT>(results[0], {{0L, 1L, 3L, 7L}});
+        EXPECT_EQ(CollectPathLengths(results[1]), std::vector<int64_t>({4}));
+        EXPECT_EQ(CollectResumeNodes(results[2]), std::vector<std::optional<int64_t>>({7L}));
+    }
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_chunked_output_across_rounds) {
     rt_state_->set_chunk_size(4);
     auto adj_matrix = BuildLengthTestGraph();
@@ -797,8 +1125,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_chunked_output_across_rou
 
 // Graph Representation:
 // 0 (end, isolated)      1 ---> 2      3 (end, isolated)
-// Both start nodes are valid end nodes with no outgoing edges, so the desired count of 2 is already
-// satisfied by the start nodes themselves and no prefixes are emitted.
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_satisfied_by_start_nodes) {
     const auto [table_state, function] =
             Prepare<TYPE_BIGINT>({{}, {2}, {}, {}}, {{0L, 3L}}, {{0L, 3L}}, std::nullopt, "N:PC2");
@@ -808,13 +1134,19 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_satisfied_by_start_nodes)
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_satisfied_by_start_nodes_marks_rows_complete) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{}, {2}, {}, {}}, {{0L, 3L}}, {{0L, 3L}}, std::nullopt, "N:PC2");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L}, {3L}});
+    EXPECT_EQ(CollectPathLengths(result_columns[1]), std::vector<int64_t>({1, 1}));
+    EXPECT_EQ(CollectResumeNodes(result_columns[2]), std::vector<std::optional<int64_t>>({std::nullopt, std::nullopt}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
 // Graph Representation:
 // 0 ---> 1 ---> 4(end)      2 ---> 3 ---> 4(end)
-// The seeded round-0 frontier takes no part in the stop check, so prefix mode always advances by at
-// least one hop: two start nodes with a desired count of 2 would already satisfy the count as bare
-// seeds, yet what comes back is the round-1 frontier, one hop further along. Unlike
-// prefix_count_satisfied_by_start_nodes - whose start nodes have no outgoing edges - this graph can
-// tell the two behaviors apart.
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_always_advances_at_least_one_hop) {
     const auto [table_state, function] =
             Prepare<TYPE_BIGINT>({{1}, {4}, {3}, {4}, {}}, {{0L, 2L}}, {{4L}}, std::nullopt, "N:PC2");
@@ -831,10 +1163,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_always_advances_at_least_
 //    v       |
 //    0 ----> 1
 // (no end nodes at all)
-// The whole frontier search runs inside a single process() call, so it has to notice cancellation
-// itself rather than relying on the pipeline driver's between-operator check. This is the shape that
-// runs longest - an unreachable non-branching cycle spinning to the round cap - so a cancelled query
-// must come back with a Cancelled status instead of the rows it would otherwise have produced.
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_search_honors_cancellation) {
     rt_state_->set_is_cancelled(true);
     const auto [table_state, function] =
@@ -846,9 +1174,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_search_honors_cancellatio
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
-// (See BuildLengthTestGraph for representation)
-// With a desired count far above what the graph can produce, the search runs until the frontier
-// empties naturally. The resulting row set must then be identical to legacy mode on the same graph.
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_exhausted_matches_legacy_mode) {
     auto adj_matrix = BuildLengthTestGraph();
 
@@ -871,21 +1196,51 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_exhausted_matches_legacy_
     EXPECT_EQ(prefix_mode_paths, legacy_mode_paths);
 }
 
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_exhausted_matches_legacy_mode_metadata) {
+    using Row = std::tuple<std::vector<int64_t>, int64_t, std::optional<int64_t>>;
+    auto adj_matrix = BuildLengthTestGraph();
+
+    auto sorted_rows_for = [&](const std::optional<std::string>& config_str) {
+        const auto [table_state, function] =
+                Prepare<TYPE_BIGINT>(adj_matrix, {{0L}}, {{21L}}, std::nullopt, config_str);
+        const auto [result_columns, offset] = Run(table_state, function.get());
+        EXPECT_OK(table_state->status());
+        EXPECT_EQ(table_state->processed_rows(), 1);
+        auto paths = CollectPaths<TYPE_BIGINT>(result_columns[0]);
+        auto lengths = CollectPathLengths(result_columns[1]);
+        auto resume_nodes = CollectResumeNodes(result_columns[2]);
+        EXPECT_OK(function->close(nullptr, table_state));
+
+        std::vector<Row> rows;
+        for (size_t i = 0; i < paths.size(); ++i) {
+            rows.emplace_back(paths[i], lengths[i], resume_nodes[i]);
+        }
+        std::sort(rows.begin(), rows.end());
+        return rows;
+    };
+
+    const auto prefix_mode_rows = sorted_rows_for("N:BW:3:4:PC1000");
+    const auto legacy_mode_rows = sorted_rows_for("N:BW:3:4");
+
+    EXPECT_FALSE(legacy_mode_rows.empty());
+    EXPECT_EQ(prefix_mode_rows, legacy_mode_rows);
+    for (const auto& [path, length, resume_node] : legacy_mode_rows) {
+        EXPECT_EQ(resume_node, std::nullopt);
+        EXPECT_EQ(length, static_cast<int64_t>(path.size()));
+    }
+}
+
 // Graph Representation:
 //    +-------+
 //    v       |
 //    0 ----> 1
 // (no end nodes at all)
-// A single non-branching cycle keeps the frontier at exactly one path forever: it is never terminal
-// and always has exactly one extension, so neither the desired count nor an empty frontier can stop
-// the search. The hard round cap (bounded by the node count) makes the call return promptly.
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_unreachable_end_hits_safety_cap) {
     const auto [table_state, function] =
             Prepare<TYPE_BIGINT>({{1}, {0}}, {{0L}}, std::vector<std::optional<int64_t>>{}, std::nullopt, "W:PC5");
     const auto [result_columns, offset] = Run(table_state, function.get());
 
     EXPECT_OK(table_state->status());
-    // 2 nodes => at most 2 extra rounds after the first, i.e. paths of at most 4 nodes.
     EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 0L, 1L}});
     EXPECT_EQ(table_state->processed_rows(), 1);
     EXPECT_OK(function->close(nullptr, table_state));
@@ -893,8 +1248,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_unreachable_end_hits_safe
 
 // Graph Representation:
 // 0 <--> 1 ---> 2
-// Cycles are allowed without an upper-bounded length comparison, which is only valid because a
-// prefix count is requested.
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_allows_cycles_without_upper_bound) {
     const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1}, {0, 2}, {}}, {{0L}}, {{2L}}, std::nullopt, "W:PC3");
     const auto [result_columns, offset] = Run(table_state, function.get());
@@ -908,8 +1261,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_allows_cycles_without_upp
 // 0 --+
 //     +--> 2 ---> 3
 // 1 --+
-// Two independent frontier paths both need to traverse node 2. A shared/global visited set would
-// wrongly block the second one, so this pins down that cycle detection is genuinely per path.
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_cycle_detection_is_per_path) {
     const auto [table_state, function] =
             Prepare<TYPE_BIGINT>({{2}, {2}, {3}, {}}, {{0L, 1L}}, {{3L}}, std::nullopt, "N:PC100");
@@ -924,11 +1275,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_cycle_detection_is_per_pa
 //    +-------+
 //    v       |
 //    0 ----> 1 (end)
-// With cycles allowed, a path may revisit nodes until the upper bound prunes it, so it can end up
-// longer than the graph has nodes: 'LE:9' permits paths of up to 9 nodes over a 2-node graph. The
-// round cap therefore has to scale with max_nodes, not just with the node count - capped at
-// num_nodes the search would stop after two rounds and report one completed path plus an unfinished
-// prefix instead of all four completed paths.
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_upper_bound_above_node_count) {
     const auto [table_state, function] =
             Prepare<TYPE_BIGINT>({{1}, {0}}, {{0L}}, {{1L}}, std::nullopt, "W:LE:9:PC1000");
@@ -942,9 +1288,6 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_upper_bound_above_node_co
     EXPECT_OK(function->close(nullptr, table_state));
 }
 
-// (See BuildPrefixCountTestGraph for representation)
-// Config tokens may appear in any order, so a prefix count ahead of the length comparison has to
-// behave exactly like the same config with the two tokens swapped.
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_token_order_is_irrelevant) {
     auto paths_for = [&](const std::string& config_str) {
         const auto [table_state, function] =
@@ -963,21 +1306,8 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_token_order_is_irrelevant
 
 TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_malformed_config) {
     const std::vector<std::string> invalid_configs = {
-            "N:PC",           // no digits after the marker
-            "N:PC0",          // must be positive
-            "N:PC-1",         // must be positive
-            "N:PCx",          // non-numeric
-            "N:LE:3:PC0",     // must be positive
-            "N:LE:3:PC-1",    // must be positive
-            "N:LE:3:PCx",     // non-numeric
-            "N:LE:3:PC",      // no digits after the marker
-            "N:LE:3:5",       // trailing part that is neither a prefix count nor an operator
-            "N:BW:3:4:5",     // trailing part that is neither a prefix count nor an operator
-            "N:PC5:LE",       // operator without its length parameter
-            "N:PC5:BW:3",     // between operator with only one length parameter
-            "N:LE:3:PC5:PC5", // at most one prefix count
-            "N:LE:3:GE:1"     // at most one length comparison
-    };
+            "N:PC",      "N:PC0",    "N:PC-1",     "N:PCx",    "N:LE:3:PC0", "N:LE:3:PC-1",    "N:LE:3:PCx",
+            "N:LE:3:PC", "N:LE:3:5", "N:BW:3:4:5", "N:PC5:LE", "N:PC5:BW:3", "N:LE:3:PC5:PC5", "N:LE:3:GE:1"};
 
     for (const auto& config_str : invalid_configs) {
         const auto [table_state, function] =
@@ -987,6 +1317,653 @@ TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_malformed_config) {
         EXPECT_TRUE(table_state->status().is_invalid_argument()) << "Config '" << config_str << "' was accepted";
         EXPECT_OK(function->close(nullptr, table_state));
     }
+}
+
+// Graph Representation:
+//        +--> 1 --+
+//        |        |
+//        +--(0)   v
+// 2 <-------+      3
+//                  ^
+//                  |
+//        +---------+
+// i.e. 0->1, 1->{2,3}, 2->0, 3->{} ; end node 3.
+TEST_F(CelonisObjectLinkExtractPathsTest, visited_nodes_blocks_reentry) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1}, {2, 3}, {0}, {}};
+
+    {
+        const auto [table_state, function] = Prepare<TYPE_BIGINT>(adj_matrix, {{2L}}, {{3L}});
+        const auto [result_columns, offset] = Run(table_state, function.get());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{2L, 0L, 1L, 3L}});
+        EXPECT_OK(function->close(nullptr, table_state));
+    }
+    {
+        const auto [table_state, function] =
+                Prepare<TYPE_BIGINT>(adj_matrix, {{2L}}, {{3L}}, std::nullopt, std::nullopt,
+                                     std::vector<std::vector<std::optional<int64_t>>>{{0L, 1L, 2L}});
+        const auto [result_columns, offset] = Run(table_state, function.get());
+        EXPECT_OK(table_state->status());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {});
+        EXPECT_OK(function->close(nullptr, table_state));
+    }
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, visited_nodes_ignored_when_cycles_allowed) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1}, {2, 3}, {0}, {}};
+
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>(adj_matrix, {{2L}}, {{3L}}, std::nullopt, "W:LE:4",
+                                 std::vector<std::vector<std::optional<int64_t>>>{{0L, 1L, 2L}});
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{2L, 0L, 1L, 3L}});
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, visited_nodes_length_mismatch_rejected) {
+    const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1}, {}}, {{0L, 1L}}, {{1L}}, std::nullopt, std::nullopt,
+                                                              std::vector<std::vector<std::optional<int64_t>>>{{0L}});
+    Run(table_state, function.get());
+
+    EXPECT_TRUE(table_state->status().is_invalid_argument());
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, visited_nodes_omitted_matches_legacy_five_arg_call) {
+    const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1}, {2}, {}}, {{0L}}, {{2L}});
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 2L}});
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, visited_nodes_rejected_with_prefix_count) {
+    const auto [table_state, function] = Prepare<TYPE_BIGINT>({{1}, {2}, {}}, {{0L}}, {{2L}}, std::nullopt, "N:PC2",
+                                                              std::vector<std::vector<std::optional<int64_t>>>{{0L}});
+    Run(table_state, function.get());
+
+    EXPECT_TRUE(table_state->status().is_invalid_argument());
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+// 0 ---> 2 ---> 3 <--- 2 <--- 1
+// (0 and 1 both point at 2, which points at 3)
+TEST_F(CelonisObjectLinkExtractPathsTest, visited_nodes_is_independent_per_start_node) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{2}, {2}, {3}, {}}, {{0L, 1L}}, {{3L}}, std::nullopt, std::nullopt,
+                                 std::vector<std::vector<std::optional<int64_t>>>{{2L}, {}});
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{1L, 2L, 3L}});
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, resume_node_handover_across_two_calls) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1}, {2, 3}, {0}, {4}, {}};
+
+    const auto [first_state, first_function] = Prepare<TYPE_BIGINT>(adj_matrix, {{0L}}, {{4L}}, std::nullopt, "N:PC2");
+    const auto [first_columns, first_offset] = Run(first_state, first_function.get());
+    const auto first_paths = CollectPaths<TYPE_BIGINT>(first_columns[0]);
+    const auto resume_nodes = CollectResumeNodes(first_columns[2]);
+    ASSERT_EQ(first_paths, (std::vector<std::vector<int64_t>>{{0L, 1L, 2L}, {0L, 1L, 3L}}));
+    ASSERT_EQ(resume_nodes, (std::vector<std::optional<int64_t>>{2L, 3L}));
+    EXPECT_OK(first_function->close(nullptr, first_state));
+
+    const std::vector<std::optional<int64_t>> next_start_nodes = resume_nodes;
+    const std::vector<std::vector<std::optional<int64_t>>> visited_nodes_for_next_call = {
+            std::vector<std::optional<int64_t>>(first_paths[0].begin(), first_paths[0].end()),
+            std::vector<std::optional<int64_t>>(first_paths[1].begin(), first_paths[1].end())};
+
+    {
+        const auto [table_state, function] = Prepare<TYPE_BIGINT>(adj_matrix, next_start_nodes, {{4L}});
+        const auto [result_columns, offset] = Run(table_state, function.get());
+        EXPECT_OK(table_state->status());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{2L, 0L, 1L, 3L, 4L}, {3L, 4L}});
+        EXPECT_OK(function->close(nullptr, table_state));
+    }
+    {
+        const auto [table_state, function] = Prepare<TYPE_BIGINT>(adj_matrix, next_start_nodes, {{4L}}, std::nullopt,
+                                                                  std::nullopt, visited_nodes_for_next_call);
+        const auto [result_columns, offset] = Run(table_state, function.get());
+        EXPECT_OK(table_state->status());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{3L, 4L}});
+        EXPECT_OK(function->close(nullptr, table_state));
+    }
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, prefix_count_resume_node_matches_own_path_across_start_nodes) {
+    const auto [table_state, function] =
+            Prepare<TYPE_BIGINT>({{1}, {2, 3}, {}, {}, {5}, {}}, {{0L, 4L}}, {{5L}}, std::nullopt, "N:PC3");
+    const auto [result_columns, offset] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{4L, 5L}, {0L, 1L, 2L}, {0L, 1L, 3L}});
+    EXPECT_EQ(CollectPathLengths(result_columns[1]), std::vector<int64_t>({2, 3, 3}));
+    EXPECT_EQ(CollectResumeNodes(result_columns[2]), std::vector<std::optional<int64_t>>({std::nullopt, 2L, 3L}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+//        +--> 1 --+
+//        |        v
+//        0        3
+//        |        ^
+//        +--> 2 --+
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_groups_output_per_input_row) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const auto [table_state, function] = PrepareRows({{.adj_matrix = adj_matrix, .start_node = 0L, .end_nodes = {3L}},
+                                                      {.adj_matrix = adj_matrix, .start_node = 1L, .end_nodes = {3L}}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}, {1L, 3L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2, 3}));
+    EXPECT_EQ(table_state->processed_rows(), 2);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_null_start_node_emits_nothing) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const auto [table_state, function] =
+            PrepareRows({{.adj_matrix = adj_matrix, .start_node = 0L, .end_nodes = {3L}},
+                         {.adj_matrix = adj_matrix, .start_node = std::nullopt, .end_nodes = {3L}},
+                         {.adj_matrix = adj_matrix, .start_node = 1L, .end_nodes = {3L}}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}, {1L, 3L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2, 2, 3}));
+    EXPECT_EQ(table_state->processed_rows(), 3);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+// 0 ---> 2 ---> 3 <--- 2 <--- 1
+// (0 and 1 both point at 2, which points at 3)
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_visited_nodes_are_per_input_row) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{2}, {2}, {3}, {}};
+    const auto [table_state, function] = PrepareRows(
+            {{.adj_matrix = adj_matrix, .start_node = 0L, .end_nodes = {3L}, .visited_nodes = {{2L}}},
+             {.adj_matrix = adj_matrix, .start_node = 1L, .end_nodes = {3L}, .visited_nodes = std::nullopt}},
+            std::nullopt, /*pass_visited_nodes=*/true);
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{1L, 2L, 3L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 0, 1}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_reads_graph_and_end_nodes_per_input_row) {
+    const auto [table_state, function] =
+            PrepareRows({{.adj_matrix = {{1}, {}}, .start_node = 0L, .end_nodes = {1L}},
+                         {.adj_matrix = {{1}, {2}, {}}, .start_node = 0L, .end_nodes = {2L}}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L}, {0L, 1L, 2L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 1, 2}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_resumes_across_chunks) {
+    rt_state_->set_chunk_size(1);
+
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const auto [table_state, function] = PrepareRows({{.adj_matrix = adj_matrix, .start_node = 0L, .end_nodes = {3L}},
+                                                      {.adj_matrix = adj_matrix, .start_node = 1L, .end_nodes = {3L}}});
+
+    std::vector<std::vector<int64_t>> paths;
+    size_t calls = 0;
+    while (table_state->processed_rows() < 2) {
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+        ASSERT_OK(table_state->status());
+        const auto row_offsets = CollectRowOffsets(offsets);
+        ASSERT_FALSE(row_offsets.empty());
+        EXPECT_EQ(row_offsets.front(), 0);
+        EXPECT_LE(row_offsets.back(), 1);
+        for (auto& path : CollectPaths<TYPE_BIGINT>(result_columns[0])) {
+            paths.push_back(std::move(path));
+        }
+        ASSERT_LT(++calls, 10) << "process() is not making progress";
+    }
+
+    EXPECT_EQ(paths, (std::vector<std::vector<int64_t>>{{0L, 1L, 3L}, {0L, 2L, 3L}, {1L, 3L}}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+// 0 ---> 1 ---> {2, 3}
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_prefix_count_applies_per_input_row) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1}, {2, 3}, {}, {}};
+    const auto [table_state, function] = PrepareRows({{.adj_matrix = adj_matrix, .start_node = 0L, .end_nodes = {}},
+                                                      {.adj_matrix = adj_matrix, .start_node = 1L, .end_nodes = {}}},
+                                                     "N:PC2");
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 2L}, {0L, 1L, 3L}, {1L, 2L}, {1L, 3L}});
+    EXPECT_EQ(CollectResumeNodes(result_columns[2]), std::vector<std::optional<int64_t>>({2L, 3L, 2L, 3L}));
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2, 4}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_visited_nodes_rejected_with_prefix_count) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1}, {2}, {}};
+
+    const std::vector<std::optional<std::vector<std::optional<int64_t>>>> visited_node_variants = {
+            std::vector<std::optional<int64_t>>{0L}, std::nullopt};
+    for (const auto& visited_nodes : visited_node_variants) {
+        const auto [table_state, function] = PrepareRows(
+                {{.adj_matrix = adj_matrix, .start_node = 1L, .end_nodes = {2L}, .visited_nodes = visited_nodes}},
+                "N:PC2", /*pass_visited_nodes=*/true);
+        Run(table_state, function.get());
+
+        EXPECT_TRUE(table_state->status().is_invalid_argument())
+                << "A prefix count was accepted alongside the visited_nodes argument";
+        EXPECT_OK(function->close(nullptr, table_state));
+    }
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_null_start_node_does_not_bypass_prefix_count_rejection) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1}, {2}, {}};
+
+    const std::vector<std::optional<std::vector<std::optional<int64_t>>>> visited_node_variants = {
+            std::vector<std::optional<int64_t>>{0L}, std::nullopt};
+    for (const auto& visited_nodes : visited_node_variants) {
+        const auto [table_state, function] = PrepareRows({{.adj_matrix = adj_matrix,
+                                                           .start_node = std::nullopt,
+                                                           .end_nodes = {2L},
+                                                           .visited_nodes = visited_nodes}},
+                                                         "N:PC2", /*pass_visited_nodes=*/true);
+        Run(table_state, function.get());
+
+        EXPECT_TRUE(table_state->status().is_invalid_argument())
+                << "A prefix count was accepted alongside the visited_nodes argument on a NULL start_node row";
+        EXPECT_OK(function->close(nullptr, table_state));
+    }
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_constraints_are_per_input_row) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const std::vector<std::vector<std::optional<int64_t>>> block_second_edge = {{0, 1}, {0}, {0}, {}};
+    const auto [table_state, function] = PrepareRows(
+            {{.adj_matrix = adj_matrix, .start_node = 0L, .end_nodes = {3L}, .constraints = std::nullopt},
+             {.adj_matrix = adj_matrix, .start_node = 0L, .end_nodes = {3L}, .constraints = block_second_edge}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}, {0L, 1L, 3L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2, 3}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_constraints_mismatch_rejected) {
+    const auto [table_state, function] =
+            PrepareRows({{.adj_matrix = {{1, 2}, {3}, {3}, {}},
+                          .start_node = 0L,
+                          .end_nodes = {3L},
+                          .constraints = std::vector<std::vector<std::optional<int64_t>>>{{0}, {0}, {0}, {}}}});
+    Run(table_state, function.get());
+
+    EXPECT_TRUE(table_state->status().is_invalid_argument());
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, row_per_start_node_invalid_start_node_rejected) {
+    const auto [table_state, function] = PrepareRows({{.adj_matrix = {{1}, {}}, .start_node = 0L, .end_nodes = {1L}},
+                                                      {.adj_matrix = {{1}, {}}, .start_node = 2L, .end_nodes = {1L}}});
+    Run(table_state, function.get());
+
+    EXPECT_TRUE(table_state->status().is_invalid_argument());
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+//        +--> 1 --+
+//        |        v
+//        0        3
+//        |        ^
+//        +--> 2 --+
+TEST_F(CelonisObjectLinkExtractPathsTest, array_layout_groups_output_per_input_row) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const auto [table_state, function] =
+            PrepareArrayRows({{.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{3L}}},
+                              {.adj_matrix = adj_matrix, .start_nodes = {{1L}}, .end_nodes = {{3L}}}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}, {1L, 3L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2, 3}));
+    EXPECT_EQ(table_state->processed_rows(), 2);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, array_layout_batching_start_nodes_does_not_change_the_paths) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const std::vector<std::vector<int64_t>> expected_paths = {{0L, 1L, 3L}, {0L, 2L, 3L}, {1L, 3L}, {2L, 3L}};
+
+    const std::vector<std::vector<std::vector<std::optional<int64_t>>>> batchings = {
+            {{0L, 1L, 2L}}, {{0L, 1L}, {2L}}, {{0L}, {1L}, {2L}}};
+    for (const auto& batching : batchings) {
+        std::vector<ArrayLayoutRow> rows;
+        rows.reserve(batching.size());
+        for (const auto& start_nodes : batching) {
+            rows.push_back({.adj_matrix = adj_matrix, .start_nodes = start_nodes, .end_nodes = {{3L}}});
+        }
+        const auto [table_state, function] = PrepareArrayRows(rows);
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+
+        EXPECT_OK(table_state->status());
+        EXPECT_EQ(CollectPaths<TYPE_BIGINT>(result_columns[0]), expected_paths)
+                << "Batching the start nodes into " << batching.size() << " rows changed the paths";
+        EXPECT_EQ(table_state->processed_rows(), batching.size());
+        EXPECT_OK(function->close(nullptr, table_state));
+    }
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, array_layout_arguments_are_read_per_input_row) {
+    const auto [table_state, function] = PrepareArrayRows(
+            {{.adj_matrix = {{1}, {}}, .start_nodes = {{0L}}, .end_nodes = {{1L}}, .config_str = "N:EQ:2"},
+             {.adj_matrix = {{1}, {2}, {}}, .start_nodes = {{0L}}, .end_nodes = {{2L}}, .config_str = "N:EQ:3"},
+             {.adj_matrix = {{1}, {}},
+              .start_nodes = {{0L}},
+              .end_nodes = {{1L}},
+              .constraints = {{{1}, {}}},
+              .config_str = "N:EQ:2"}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L}, {0L, 1L, 2L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 1, 2, 2}));
+    EXPECT_EQ(table_state->processed_rows(), 3);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, array_layout_empty_start_nodes_emit_nothing) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const auto [table_state, function] =
+            PrepareArrayRows({{.adj_matrix = adj_matrix, .start_nodes = {{1L}}, .end_nodes = {{3L}}},
+                              {.adj_matrix = adj_matrix, .start_nodes = std::nullopt, .end_nodes = {{3L}}},
+                              {.adj_matrix = adj_matrix, .start_nodes = {{2L}}, .end_nodes = {{3L}}}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{1L, 3L}, {2L, 3L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 1, 1, 2}));
+    EXPECT_EQ(table_state->processed_rows(), 3);
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, array_layout_multiple_rows_yield_across_chunks) {
+    rt_state_->set_chunk_size(2);
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const auto [table_state, function] =
+            PrepareArrayRows({{.adj_matrix = adj_matrix, .start_nodes = {{0L, 1L}}, .end_nodes = {{3L}}},
+                              {.adj_matrix = adj_matrix, .start_nodes = {{2L}}, .end_nodes = {{3L}}}});
+
+    {
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}});
+        EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2}));
+        EXPECT_EQ(table_state->processed_rows(), 0);
+    }
+
+    {
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{1L, 3L}, {2L, 3L}});
+        EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 1, 2}));
+        EXPECT_EQ(table_state->processed_rows(), 1);
+    }
+
+    {
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {});
+        EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 0}));
+        EXPECT_EQ(table_state->processed_rows(), 2);
+    }
+
+    EXPECT_OK(table_state->status());
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, array_layout_visited_nodes_rejected_with_prefix_count) {
+    const std::vector<std::optional<std::vector<std::vector<std::optional<int64_t>>>>> visited_node_variants = {
+            std::vector<std::vector<std::optional<int64_t>>>{{0L}}, std::nullopt};
+    for (const auto& visited_nodes : visited_node_variants) {
+        const auto [table_state, function] = PrepareArrayRows({{.adj_matrix = {{1}, {2}, {}},
+                                                                .start_nodes = {{0L}},
+                                                                .end_nodes = {{2L}},
+                                                                .config_str = "N:PC2",
+                                                                .visited_nodes = visited_nodes}},
+                                                              /*pass_visited_nodes=*/true);
+        Run(table_state, function.get());
+
+        EXPECT_TRUE(table_state->status().is_invalid_argument())
+                << "A prefix count was accepted alongside the visited_nodes argument";
+        EXPECT_OK(function->close(nullptr, table_state));
+    }
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, array_layout_visited_nodes_are_per_input_row) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    using VisitedNodes = std::vector<std::vector<std::optional<int64_t>>>;
+    const auto [table_state, function] = PrepareArrayRows({{.adj_matrix = adj_matrix,
+                                                            .start_nodes = {{0L}},
+                                                            .end_nodes = {{3L}},
+                                                            .visited_nodes = VisitedNodes{{1L}}},
+                                                           {.adj_matrix = adj_matrix,
+                                                            .start_nodes = {{0L}},
+                                                            .end_nodes = {{3L}},
+                                                            .visited_nodes = VisitedNodes{{}}}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 2L, 3L}, {0L, 1L, 3L}, {0L, 2L, 3L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 1, 3}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+//        +--> 3
+//        |
+//   +--> 1 --> 4        5 (the only end node, and unreachable)
+//   |
+//   0 --> 2
+TEST_F(CelonisObjectLinkExtractPathsTest, array_layout_prefix_count_applies_per_input_row) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3, 4}, {}, {}, {}, {}};
+    const auto [table_state, function] = PrepareArrayRows(
+            {{.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{5L}}, .config_str = "N:PC2"},
+             {.adj_matrix = adj_matrix, .start_nodes = {{1L}}, .end_nodes = {{5L}}, .config_str = "N:PC2"}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L}, {0L, 2L}, {1L, 3L}, {1L, 4L}});
+    EXPECT_EQ(CollectResumeNodes(result_columns[2]), std::vector<std::optional<int64_t>>({1L, 2L, 3L, 4L}));
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2, 4}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, array_layout_prefix_count_chunked_output_spans_rows) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3, 4}, {}, {}, {}, {}};
+    rt_state_->set_chunk_size(1);
+    const auto [table_state, function] = PrepareArrayRows(
+            {{.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{5L}}, .config_str = "N:PC2"},
+             {.adj_matrix = adj_matrix, .start_nodes = {{1L}}, .end_nodes = {{5L}}, .config_str = "N:PC2"}});
+
+    {
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L}});
+        EXPECT_EQ(CollectResumeNodes(result_columns[2]), std::vector<std::optional<int64_t>>({1L}));
+        EXPECT_EQ(table_state->processed_rows(), 0);
+        EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 1}));
+    }
+    {
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 2L}});
+        EXPECT_EQ(CollectResumeNodes(result_columns[2]), std::vector<std::optional<int64_t>>({2L}));
+        EXPECT_EQ(table_state->processed_rows(), 1);
+        EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 1}));
+    }
+    {
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{1L, 3L}});
+        EXPECT_EQ(CollectResumeNodes(result_columns[2]), std::vector<std::optional<int64_t>>({3L}));
+        EXPECT_EQ(table_state->processed_rows(), 1);
+        EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 1}));
+    }
+    {
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{1L, 4L}});
+        EXPECT_EQ(CollectResumeNodes(result_columns[2]), std::vector<std::optional<int64_t>>({4L}));
+        EXPECT_EQ(table_state->processed_rows(), 2);
+        EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 1}));
+    }
+
+    EXPECT_OK(table_state->status());
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+//        +--> 1 --+
+//        |        v
+//        0        3
+//        |        ^
+//        +--> 2 --+
+TEST_F(CelonisObjectLinkExtractPathsTest, end_nodes_are_resolved_per_input_row) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const auto [table_state, function] =
+            PrepareArrayRows({{.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{3L}}},
+                              {.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{1L}}},
+                              {.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{3L}}}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}, {0L, 1L}, {0L, 1L, 3L}, {0L, 2L, 3L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2, 3, 5}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, end_nodes_are_revalidated_against_each_rows_graph) {
+    const auto [table_state, function] =
+            PrepareArrayRows({{.adj_matrix = {{1}, {2}, {3}, {4}, {}}, .start_nodes = {{0L}}, .end_nodes = {{4L}}},
+                              {.adj_matrix = {{1}, {}}, .start_nodes = {{0L}}, .end_nodes = {{4L}}}});
+    Run(table_state, function.get());
+
+    EXPECT_TRUE(table_state->status().is_invalid_argument()) << "An end node outside the row's own graph was accepted";
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+// Graph Representation:
+// 0 ---> 1 ---> 2
+TEST_F(CelonisObjectLinkExtractPathsTest, config_is_resolved_per_input_row) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1}, {2}, {}};
+    const auto [table_state, function] = PrepareArrayRows(
+            {{.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{2L}}, .config_str = "N:EQ:3"},
+             {.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{2L}}, .config_str = "N:EQ:2"},
+             {.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{2L}}, .config_str = "N:EQ:3"}});
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 2L}, {0L, 1L, 2L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 1, 1, 2}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, stale_traversal_state_is_cleared_when_new_params_arrive) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    rt_state_->set_chunk_size(1);
+    const auto [table_state, function] = Prepare<TYPE_BIGINT>(adj_matrix, {{0L}}, {{3L}});
+
+    {
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}});
+        EXPECT_EQ(table_state->processed_rows(), 0);
+    }
+
+    rt_state_->set_chunk_size(4096);
+    table_state->set_params(BuildArrayLayoutColumns<TYPE_BIGINT>(adj_matrix, {{0L}}, {{3L}}));
+
+    {
+        const auto [result_columns, offsets] = Run(table_state, function.get());
+        EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}});
+        EXPECT_EQ(table_state->processed_rows(), 1);
+    }
+
+    EXPECT_OK(table_state->status());
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, config_argument_as_const_column_is_resolved_once) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const auto [table_state, function] = PrepareArrayRows(
+            {{.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{3L}}, .config_str = "N:EQ:3"},
+             {.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{1L}}, .config_str = "N:EQ:3"}});
+
+    auto config_elements = BinaryColumn::create();
+    config_elements->append("N:EQ:3");
+    auto config_nulls = NullColumn::create();
+    config_nulls->append(0);
+    auto single_config = NullableColumn::create(std::move(config_elements), std::move(config_nulls));
+    table_state->get_columns()[4] = ConstColumn::create(std::move(single_config), 2);
+
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2, 2}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, start_node_argument_as_const_column_in_row_per_start_node_layout) {
+    const auto [table_state, function] =
+            PrepareRows({{.adj_matrix = {{1, 2}, {3}, {3}, {}}, .start_node = 0L, .end_nodes = {{3L}}},
+                         {.adj_matrix = {{1}, {}}, .start_node = 0L, .end_nodes = {{1L}}}});
+
+    auto single_start = NullableColumn::create(Int64Column::create(), NullColumn::create());
+    single_start->append_datum(int64_t{0});
+    table_state->get_columns()[1] = ConstColumn::create(std::move(single_start), 2);
+
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}, {0L, 1L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2, 3}));
+    EXPECT_OK(function->close(nullptr, table_state));
+}
+
+TEST_F(CelonisObjectLinkExtractPathsTest, constraint_argument_as_const_null_column_is_treated_as_no_constraints) {
+    const std::vector<std::vector<std::optional<int64_t>>> adj_matrix = {{1, 2}, {3}, {3}, {}};
+    const auto [table_state, function] =
+            PrepareArrayRows({{.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{3L}}},
+                              {.adj_matrix = adj_matrix, .start_nodes = {{0L}}, .end_nodes = {{1L}}}});
+
+    // A whole-column constant NULL, in the same nested shape BuildArrayLayoutColumns() uses for
+    // "no constraints supplied", but delivered as a ConstColumn instead of one row per input row.
+    auto inner_elements = NullableColumn::create(Int64Column::create(), NullColumn::create());
+    auto inner_offsets = UInt32Column::create();
+    auto inner_array = ArrayColumn::create(std::move(inner_elements), std::move(inner_offsets));
+    auto outer_elements_nulls = NullColumn::create(inner_array->size(), 0);
+    auto outer_elements = NullableColumn::create(std::move(inner_array), std::move(outer_elements_nulls));
+    auto outer_offsets = UInt32Column::create();
+    outer_offsets->append(0);
+    outer_offsets->append(0);
+    auto outer_nulls = NullColumn::create();
+    outer_nulls->append(1);
+    auto single_null_constraint = NullableColumn::create(
+            ArrayColumn::create(std::move(outer_elements), std::move(outer_offsets)), std::move(outer_nulls));
+    table_state->get_columns()[3] = ConstColumn::create(std::move(single_null_constraint), 2);
+
+    const auto [result_columns, offsets] = Run(table_state, function.get());
+
+    EXPECT_OK(table_state->status());
+    EvaluatePaths<TYPE_BIGINT>(result_columns[0], {{0L, 1L, 3L}, {0L, 2L, 3L}, {0L, 1L}});
+    EXPECT_EQ(CollectRowOffsets(offsets), std::vector<uint32_t>({0, 2, 3}));
+    EXPECT_OK(function->close(nullptr, table_state));
 }
 
 } // namespace starrocks

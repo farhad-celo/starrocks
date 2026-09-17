@@ -187,13 +187,38 @@ public class TableFunction extends Function {
                 Lists.newArrayList(Type.BIGINT, Type.BIGINT));
         functionSet.addBuiltin(objectLinkPropagateFilters);
 
-        TableFunction objectLinkExtractPaths;
-        objectLinkExtractPaths = new TableFunction(new FunctionName("celonis_object_link_extract_paths"),
+        TableFunction objectLinkExtractPaths = new TableFunction(new FunctionName("celonis_object_link_extract_paths"),
                 Lists.newArrayList("path_col"),
                 Lists.newArrayList(new ArrayType(Type.ARRAY_BIGINT), Type.ARRAY_BIGINT, Type.ARRAY_BIGINT,
                         new ArrayType(Type.ARRAY_BIGINT), Type.VARCHAR),
                 Lists.newArrayList(Type.ARRAY_BIGINT));
         functionSet.addBuiltin(objectLinkExtractPaths);
+
+        TableFunction objectLinkExtractPathsV2;
+        objectLinkExtractPathsV2 = new TableFunction(new FunctionName("celonis_object_link_extract_paths_v2"),
+                Lists.newArrayList("path_col", "path_length", "resume_node"),
+                Lists.newArrayList(new ArrayType(Type.ARRAY_BIGINT), Type.ARRAY_BIGINT, Type.ARRAY_BIGINT,
+                        new ArrayType(Type.ARRAY_BIGINT), Type.VARCHAR),
+                Lists.newArrayList(Type.ARRAY_BIGINT, Type.BIGINT, Type.BIGINT));
+        functionSet.addBuiltin(objectLinkExtractPathsV2);
+        objectLinkExtractPathsV2 = new TableFunction(new FunctionName("celonis_object_link_extract_paths_v2"),
+                Lists.newArrayList("path_col", "path_length", "resume_node"),
+                Lists.newArrayList(new ArrayType(Type.ARRAY_BIGINT), Type.ARRAY_BIGINT, Type.ARRAY_BIGINT,
+                        new ArrayType(Type.ARRAY_BIGINT), Type.VARCHAR, new ArrayType(Type.ARRAY_BIGINT)),
+                Lists.newArrayList(Type.ARRAY_BIGINT, Type.BIGINT, Type.BIGINT));
+        functionSet.addBuiltin(objectLinkExtractPathsV2);
+        objectLinkExtractPathsV2 = new TableFunction(new FunctionName("celonis_object_link_extract_paths_v2"),
+                Lists.newArrayList("path_col", "path_length", "resume_node"),
+                Lists.newArrayList(new ArrayType(Type.ARRAY_BIGINT), Type.BIGINT, Type.ARRAY_BIGINT,
+                        new ArrayType(Type.ARRAY_BIGINT), Type.VARCHAR),
+                Lists.newArrayList(Type.ARRAY_BIGINT, Type.BIGINT, Type.BIGINT));
+        functionSet.addBuiltin(objectLinkExtractPathsV2);
+        objectLinkExtractPathsV2 = new TableFunction(new FunctionName("celonis_object_link_extract_paths_v2"),
+                Lists.newArrayList("path_col", "path_length", "resume_node"),
+                Lists.newArrayList(new ArrayType(Type.ARRAY_BIGINT), Type.BIGINT, Type.ARRAY_BIGINT,
+                        new ArrayType(Type.ARRAY_BIGINT), Type.VARCHAR, Type.ARRAY_BIGINT),
+                Lists.newArrayList(Type.ARRAY_BIGINT, Type.BIGINT, Type.BIGINT));
+        functionSet.addBuiltin(objectLinkExtractPathsV2);
     }
 
     public List<Type> getTableFnReturnTypes() {

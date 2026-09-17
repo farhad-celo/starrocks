@@ -162,7 +162,32 @@ void TableFunctionResolver::add_celonis_function_mapping() {
     add_function_mapping("celonis_object_link_propagate_filters", {TYPE_ARRAY, TYPE_ARRAY, TYPE_BIGINT}, {TYPE_BIGINT, TYPE_BIGINT}, std::make_shared<CelonisObjectLinkPropagateFilters>());
 
     // celonis_object_link_extract_paths(<adjacency_matrix>, <start nodes>, <end nodes>, <constraint edges>, <configuration string>)
-    add_function_mapping("celonis_object_link_extract_paths", {TYPE_ARRAY, TYPE_ARRAY, TYPE_ARRAY, TYPE_ARRAY, TYPE_VARCHAR}, {TYPE_ARRAY}, std::make_shared<CelonisObjectLinkExtractPaths>());
+    // Original 1-column output contract, preserved for backward compatibility with existing callers
+    // (e.g. Celostar's ToSQLContext). The expanded output (path_length, resume_node) lives under
+    // celonis_object_link_extract_paths_v2 below.
+    add_function_mapping("celonis_object_link_extract_paths", {TYPE_ARRAY, TYPE_ARRAY, TYPE_ARRAY, TYPE_ARRAY, TYPE_VARCHAR}, {TYPE_ARRAY}, std::make_shared<CelonisObjectLinkExtractPaths>(/*row_per_start_node=*/false, /*expanded_output=*/false));
+
+    // celonis_object_link_extract_paths_v2(<adjacency_matrix>, <start nodes>, <end nodes>, <constraint edges>, <configuration string>)
+    add_function_mapping("celonis_object_link_extract_paths_v2", {TYPE_ARRAY, TYPE_ARRAY, TYPE_ARRAY, TYPE_ARRAY, TYPE_VARCHAR}, {TYPE_ARRAY, TYPE_BIGINT, TYPE_BIGINT}, std::make_shared<CelonisObjectLinkExtractPaths>());
+    // celonis_object_link_extract_paths_v2(<adjacency_matrix>, <start nodes>, <end nodes>, <constraint edges>,
+    //                                       <configuration string>, <visited nodes per start node>)
+    add_function_mapping("celonis_object_link_extract_paths_v2",
+                         {TYPE_ARRAY, TYPE_ARRAY, TYPE_ARRAY, TYPE_ARRAY, TYPE_VARCHAR, TYPE_ARRAY},
+                         {TYPE_ARRAY, TYPE_BIGINT, TYPE_BIGINT}, std::make_shared<CelonisObjectLinkExtractPaths>());
+    // The same, but with one start node per input row instead of one array holding every start node,
+    // so that the traversals can be spread across fragment instances:
+    // celonis_object_link_extract_paths_v2(<adjacency_matrix>, <start node>, <end nodes>, <constraint edges>,
+    //                                       <configuration string>)
+    add_function_mapping("celonis_object_link_extract_paths_v2",
+                         {TYPE_ARRAY, TYPE_BIGINT, TYPE_ARRAY, TYPE_ARRAY, TYPE_VARCHAR},
+                         {TYPE_ARRAY, TYPE_BIGINT, TYPE_BIGINT},
+                         std::make_shared<CelonisObjectLinkExtractPaths>(/*row_per_start_node=*/true));
+    // celonis_object_link_extract_paths_v2(<adjacency_matrix>, <start node>, <end nodes>, <constraint edges>,
+    //                                       <configuration string>, <visited nodes of that start node>)
+    add_function_mapping("celonis_object_link_extract_paths_v2",
+                         {TYPE_ARRAY, TYPE_BIGINT, TYPE_ARRAY, TYPE_ARRAY, TYPE_VARCHAR, TYPE_ARRAY},
+                         {TYPE_ARRAY, TYPE_BIGINT, TYPE_BIGINT},
+                         std::make_shared<CelonisObjectLinkExtractPaths>(/*row_per_start_node=*/true));
 }
 
 const TableFunction* get_table_function(const std::string& name, const std::vector<LogicalType>& arg_type,

@@ -14,9 +14,15 @@
 
 package com.starrocks.sql.analyzer;
 
+import com.starrocks.catalog.TableFunction;
+import com.starrocks.catalog.Type;
+import com.starrocks.sql.ast.NormalizedTableFunctionRelation;
 import com.starrocks.sql.ast.QueryRelation;
 import com.starrocks.sql.ast.QueryStatement;
+import com.starrocks.sql.ast.Relation;
+import com.starrocks.sql.ast.SelectRelation;
 import com.starrocks.sql.ast.StatementBase;
+import com.starrocks.sql.ast.TableFunctionRelation;
 import com.starrocks.utframe.UtFrameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,6 +59,69 @@ public class AnalyzeLateralTest {
                 "[1], [2], [[0,1,0],[],[],[]], NULL));");
         analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths([[1,2,3],[],[],[]], " +
                 "[1], [2], [[0,1,0],[],[],[]], 'N:LE:5'));");
+    }
+
+    @Test
+    public void testObjectLinkExtractPathsWithVisitedNodes() {
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths_v2([[1,2,3],[],[],[]], " +
+                "[1], [2], NULL, 'N', [[0]]));");
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths_v2([[1,2,3],[],[],[]], " +
+                "[1], [2], [[0,1,0],[],[],[]], 'N:LE:5', [[0]]));");
+    }
+
+    @Test
+    public void testObjectLinkExtractPathsRowPerStartNode() {
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths_v2([[1,2,3],[],[],[]], " +
+                "1, [2], NULL, 'N'));");
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths_v2([[1,2,3],[],[],[]], " +
+                "1, [2], NULL, 'N', [0]));");
+        analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths_v2([[1,2,3],[],[],[]], " +
+                "1, [2], [[0,1,0],[],[],[]], 'N:LE:5', [0]));");
+
+        StatementBase stmt = analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths_v2(" +
+                "[[1,2,3],[],[],[]], 1, [2], NULL, NULL));");
+        QueryRelation queryRelation = ((QueryStatement) stmt).getQueryRelation();
+        Assertions.assertEquals("[path_col, path_length, resume_node]", queryRelation.getColumnOutputNames().toString());
+
+        Assertions.assertEquals(Type.BIGINT, resolvedTableFunction(stmt).getArgs()[1]);
+        Assertions.assertEquals(Type.ARRAY_BIGINT, resolvedTableFunction(analyzeSuccess(
+                "SELECT * from TABLE(celonis_object_link_extract_paths_v2([[1,2,3],[],[],[]], " +
+                        "[1], [2], NULL, NULL));")).getArgs()[1]);
+    }
+
+    private static TableFunction resolvedTableFunction(StatementBase stmt) {
+        QueryRelation queryRelation = ((QueryStatement) stmt).getQueryRelation();
+        Relation relation = ((SelectRelation) queryRelation).getRelation();
+        if (relation instanceof NormalizedTableFunctionRelation) {
+            relation = ((NormalizedTableFunctionRelation) relation).getRight();
+        }
+        return ((TableFunctionRelation) relation).getTableFunction();
+    }
+
+    @Test
+    public void testObjectLinkExtractPathsResumeNodeColumnName() {
+        StatementBase stmt = analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths_v2(" +
+                "[[1,2,3],[],[],[]], [1], [2], NULL, NULL));");
+        QueryRelation queryRelation = ((QueryStatement) stmt).getQueryRelation();
+        Assertions.assertEquals("[path_col, path_length, resume_node]", queryRelation.getColumnOutputNames().toString());
+
+        analyzeSuccess("SELECT resume_node from TABLE(celonis_object_link_extract_paths_v2(" +
+                "[[1,2,3],[],[],[]], [1], [2], NULL, NULL));");
+        analyzeFail("SELECT is_complete from TABLE(celonis_object_link_extract_paths_v2(" +
+                "[[1,2,3],[],[],[]], [1], [2], NULL, NULL));", "cannot be resolved");
+    }
+
+    @Test
+    public void testObjectLinkExtractPathsLegacyContract() {
+        StatementBase stmt = analyzeSuccess("SELECT * from TABLE(celonis_object_link_extract_paths(" +
+                "[[1,2,3],[],[],[]], [1], [2], NULL, NULL));");
+        QueryRelation queryRelation = ((QueryStatement) stmt).getQueryRelation();
+        Assertions.assertEquals("[path_col]", queryRelation.getColumnOutputNames().toString());
+
+        analyzeFail("SELECT path_length from TABLE(celonis_object_link_extract_paths(" +
+                "[[1,2,3],[],[],[]], [1], [2], NULL, NULL));", "cannot be resolved");
+        analyzeFail("SELECT resume_node from TABLE(celonis_object_link_extract_paths(" +
+                "[[1,2,3],[],[],[]], [1], [2], NULL, NULL));", "cannot be resolved");
     }
 
     @Test
