@@ -144,6 +144,16 @@ jobs:
           arm_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${arm_image_tag}"
           x86_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${x86_image_tag}"
           mul_arch_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${allin1_image_tag}"
+
+      - name: Build and push allin1 manifest to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${arm_image_tag}"
+          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${x86_image_tag}"
+          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${allin1_image_tag}"
+
       - name: Build and push fe-be manifest
         shell: bash
         run: |
@@ -294,6 +304,16 @@ jobs:
           arm_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${arm_image_tag}"
           x86_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${x86_image_tag}"
           mul_arch_image_tag: "ghcr.io/celonis/celostar/starrocks-allin1:${allin1_image_tag}"
+
+      - name: Build and push allin1 manifest to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        uses: ./.github/actions/build-mul-arch-manifest
+        with:
+          arm_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${arm_image_tag}"
+          x86_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${x86_image_tag}"
+          mul_arch_image_tag: "${{ env.ECR_REGISTRY }}/celostar/starrocks-allin1:${allin1_image_tag}"
+
       - name: Build and push fe-be manifest
         shell: bash
         run: |
