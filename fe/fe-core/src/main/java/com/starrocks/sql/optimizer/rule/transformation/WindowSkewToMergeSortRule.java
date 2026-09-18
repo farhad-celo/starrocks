@@ -145,9 +145,10 @@ public class WindowSkewToMergeSortRule extends TransformationRule {
                 return false;
             }
 
-            if (skewInfo.type() == DataSkew.SkewType.SKEWED_NULL) {
+            if (skewInfo.hasNullSkew()) {
                 hasNullSkew = true;
-            } else if (skewInfo.type() == DataSkew.SkewType.SKEWED_MCV) {
+            }
+            if (skewInfo.hasMcvSkew()) {
                 hasMcvSkew = true;
             }
         }

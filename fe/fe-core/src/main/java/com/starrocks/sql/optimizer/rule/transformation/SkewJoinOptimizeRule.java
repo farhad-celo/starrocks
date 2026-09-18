@@ -27,8 +27,6 @@ import com.starrocks.catalog.Type;
 import com.starrocks.common.Pair;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.metric.celonis.CelonisRuleUsageMetrics;
-import com.starrocks.sql.common.ErrorType;
-import com.starrocks.sql.common.StarRocksPlannerException;
 import com.starrocks.sql.optimizer.JoinHelper;
 import com.starrocks.sql.optimizer.OptExpression;
 import com.starrocks.sql.optimizer.OptimizerContext;
@@ -59,6 +57,7 @@ import com.starrocks.sql.optimizer.skew.DataSkew;
 import com.starrocks.sql.optimizer.statistics.Statistics;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -92,7 +91,7 @@ public class SkewJoinOptimizeRule extends TransformationRule {
     private static final String RULE_NAME = "skew_join_optimization";
     private static final String RULE_CATEGORY = "celonis_skew_rules";
 
-    private enum TriggerReason { SKEWED_NULL, SKEWED_MCV }
+    private enum TriggerReason { SKEWED_NULL, SKEWED_MCV, SKEWED_NULL_AND_MCV }
 
     private enum NoTriggerReason { NOT_SKEWED, MISSING_STATS, INACCURATE_ROW_COUNT, NO_MCV, NO_HISTOGRAM }
 
@@ -207,36 +206,36 @@ public class SkewJoinOptimizeRule extends TransformationRule {
             final var skewJoinColumn = skewPredicate.column();
             final var skewInfo = skewPredicate.skewInfo();
 
-            // Handle NULL-only skew case: when MCV is empty but NULL fraction indicates skew
-            List<ScalarOperator> skewValues;
-            TriggerReason reason;
-            if (skewInfo.type() == DataSkew.SkewType.SKEWED_NULL) {
-                reason = TriggerReason.SKEWED_NULL;
-                // Create a special NULL skew value for NULL-only skew cases
-                skewValues = Lists.newArrayList(ConstantOperator.createNull(skewJoinColumn.getType()));
-            } else if (skewInfo.type() == DataSkew.SkewType.SKEWED_MCV) {
-                reason = TriggerReason.SKEWED_MCV;
-                // Use MCV-based skew values
-                skewValues = skewInfo.maybeMcvs().get()
-                        .stream() //
-                        .map(mcv -> ConstantOperator.createVarchar(mcv.first) //
-                                .castTo(skewJoinColumn.getType())) //
-                        .filter(Optional::isPresent) //
-                        .map(Optional::get) //
-                        .collect(Collectors.toList());
+            List<ScalarOperator> skewValues = Lists.newArrayList();
+            if (skewInfo.hasNullSkew()) {
+                // Add a special NULL skew value for NULL / combined skew cases
+                skewValues.add(ConstantOperator.createNull(skewJoinColumn.getType()));
+            }
+            // Add MCV-based skew values, if any
+            skewInfo.maybeMcvs().stream()
+                    .flatMap(Collection::stream)
+                    .map(mcv -> ConstantOperator.createVarchar(mcv.first) //
+                            .castTo(skewJoinColumn.getType())) //
+                    .filter(Optional::isPresent) //
+                    .map(Optional::get) //
+                    .forEach(skewValues::add);
+            if (skewValues.isEmpty()) {
+                continue;
+            }
 
-                if (skewValues.isEmpty()) {
-                    // If all explicit casts failed.
-                    continue;
-                }
+            TriggerReason reason;
+            if (skewInfo.hasNullSkew() && skewInfo.hasMcvSkew()) {
+                reason = TriggerReason.SKEWED_NULL_AND_MCV;
+            } else if (skewInfo.hasNullSkew()) {
+                reason = TriggerReason.SKEWED_NULL;
             } else {
-                throw new StarRocksPlannerException("Did not handle skew type in SkewOptimizeRule", ErrorType.INTERNAL_ERROR);
+                reason = TriggerReason.SKEWED_MCV;
             }
 
             // Check how many rows on the other side would be affected by salting, as this can lead to a
             // cardinality blow up. We only check for MCVs since for NULLs this is not an issue as NULL does not join.
             final var skewInfoMcvs = skewInfo.getMcvs();
-            if (skewInfo.type() == DataSkew.SkewType.SKEWED_MCV && skewInfoMcvs.isPresent()) {
+            if (skewInfo.hasMcvSkew()) {
                 final var rightChildStats = input.inputAt(1).getStatistics();
                 if (rightChildStats != null && rightChildStats.getColumnStatistics().containsKey(skewPredicate.otherColumn)) {
                     final var otherColumnStats = rightChildStats.getColumnStatistic(skewPredicate.otherColumn);
@@ -245,7 +244,12 @@ public class SkewJoinOptimizeRule extends TransformationRule {
                         final var overlapRows = DataSkew.getOverlappingMcvRowCount(otherColumnStats.getHistogram().getMCV(),
                                 skewInfoMcvs.get());
                         if (overlapRows > maxOverlapRowCount) {
-                            continue;
+                            if (skewInfo.hasNullSkew()) {
+                                skewValues = Lists.newArrayList(ConstantOperator.createNull(skewJoinColumn.getType()));
+                                reason = TriggerReason.SKEWED_NULL;
+                            } else {
+                                continue;
+                            }
                         }
                     }
                 }

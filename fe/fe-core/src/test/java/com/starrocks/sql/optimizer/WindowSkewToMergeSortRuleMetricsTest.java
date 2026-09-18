@@ -27,6 +27,7 @@ import com.starrocks.sql.optimizer.rule.transformation.WindowSkewToMergeSortRule
 import com.starrocks.sql.optimizer.rule.transformation.WindowSkewToMergeSortRule.NoTriggerReason;
 import com.starrocks.sql.optimizer.rule.transformation.WindowSkewToMergeSortRule.TriggerReason;
 import com.starrocks.sql.optimizer.statistics.ColumnStatistic;
+import com.starrocks.sql.optimizer.statistics.Histogram;
 import com.starrocks.sql.optimizer.statistics.Statistics;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -81,7 +82,38 @@ class WindowSkewToMergeSortRuleMetricsTest {
                 metricValue(NOT_TRIGGERED_METRIC, NoTriggerReason.SINGLE_PARTITION_COLUMN));
     }
 
+    @Test
+    void testRuleUsageMetricsBothSkew() {
+        // GIVEN
+        ConnectContext connectContext = new ConnectContext();
+        connectContext.setThreadLocalInfo();
+        connectContext.getSessionVariable().setDataSkewRowPercentageThreshold(0.2);
+        OptimizerContext optimizerContext = new OptimizerContext(connectContext);
+        WindowSkewToMergeSortRule rule = WindowSkewToMergeSortRule.getInstance();
+        OptExpression triggeredInput =
+                expression(List.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2), bothSkewedStatistic());
+        OptExpression notTriggeredInput = expression(List.of(PARTITION_COLUMN_1));
+        long triggeredBefore = metricValue(TRIGGERED_METRIC, TriggerReason.SKEWED_NULL_AND_MCV);
+        long notTriggeredBefore = metricValue(NOT_TRIGGERED_METRIC, NoTriggerReason.SINGLE_PARTITION_COLUMN);
+
+        // WHEN
+        assertTrue(rule.check(triggeredInput, optimizerContext));
+        List<OptExpression> result = rule.transform(triggeredInput, optimizerContext);
+        assertFalse(rule.check(notTriggeredInput, optimizerContext));
+
+        // THEN
+        assertEquals(1, result.size());
+        assertEquals(triggeredBefore + 1, metricValue(TRIGGERED_METRIC, TriggerReason.SKEWED_NULL_AND_MCV));
+        assertEquals(notTriggeredBefore + 1,
+                metricValue(NOT_TRIGGERED_METRIC, NoTriggerReason.SINGLE_PARTITION_COLUMN));
+    }
+
     private static OptExpression expression(List<ScalarOperator> partitionExpressions) {
+        return expression(partitionExpressions, skewedStatistic());
+    }
+
+    private static OptExpression expression(List<ScalarOperator> partitionExpressions,
+                ColumnStatistic partitionStatistic) {
         LogicalWindowOperator window = new LogicalWindowOperator.Builder()
                 .setWindowCall(Map.of())
                 .setPartitionExpressions(partitionExpressions)
@@ -93,14 +125,21 @@ class WindowSkewToMergeSortRuleMetricsTest {
                 new LogicalValuesOperator(List.of(PARTITION_COLUMN_1, PARTITION_COLUMN_2, ORDER_COLUMN)));
         child.setStatistics(Statistics.builder()
                 .setOutputRowCount(1000)
-                .addColumnStatistic(PARTITION_COLUMN_1, skewedStatistic())
-                .addColumnStatistic(PARTITION_COLUMN_2, skewedStatistic())
+                .addColumnStatistic(PARTITION_COLUMN_1, partitionStatistic)
+                .addColumnStatistic(PARTITION_COLUMN_2, partitionStatistic)
                 .build());
         return OptExpression.create(window, child);
     }
 
     private static ColumnStatistic skewedStatistic() {
         return ColumnStatistic.builder().setNullsFraction(0.3).build();
+    }
+
+    private static ColumnStatistic bothSkewedStatistic() {
+        return ColumnStatistic.builder()
+                .setNullsFraction(0.3)
+                .setHistogram(new Histogram(List.of(), Map.of("1", 300L)))
+                .build();
     }
 
     private static long metricValue(String metricName, Enum<?> reason) {
