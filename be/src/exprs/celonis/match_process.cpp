@@ -189,25 +189,59 @@ struct MatchProcessState {
 };
 
 static StatusOr<std::unique_ptr<NFA>> from_json(MatchProcessState* func_state, const std::string& input) {
-    func_state->document.Parse(input.c_str());
+    auto& document = func_state->document;
+    document.Parse(input.c_str(), input.size());
+    if (document.HasParseError() || !document.IsObject()) {
+        return Status::JsonFormatError("NFA specification must be a valid JSON object");
+    }
+    if (!document.HasMember("states") || !document["states"].IsArray() || document["states"].Empty()) {
+        return Status::JsonFormatError("NFA states must be a non-empty array");
+    }
+    const rapidjson::Value& states = document["states"];
+    const auto is_valid_state = [&](const rapidjson::Value& value) {
+        return value.IsInt() && value.GetInt() >= 0 && static_cast<rapidjson::SizeType>(value.GetInt()) < states.Size();
+    };
+    if (!document.HasMember("initialState") || !is_valid_state(document["initialState"])) {
+        return Status::JsonFormatError("NFA initialState must be an integer in [0, states.size())");
+    }
     std::unique_ptr<NFA> result = std::make_unique<NFA>();
-    result->initial_state = func_state->document["initialState"].GetInt();
+    result->initial_state = document["initialState"].GetInt();
 
-    const rapidjson::Value& states = func_state->document["states"];
     for (rapidjson::SizeType i = 0; i < states.Size(); ++i) {
+        if (!states[i].IsObject() || !states[i].HasMember("final") || !states[i]["final"].IsBool() ||
+            !states[i].HasMember("transitions") || !states[i]["transitions"].IsArray()) {
+            return Status::JsonFormatError(
+                    "NFA states must be objects with a boolean final and an array of transitions");
+        }
         std::unique_ptr<NFA::State> state = std::make_unique<NFA::State>();
         const rapidjson::Value& transitions = states[i]["transitions"];
         state->is_final = states[i]["final"].GetBool();
         for (rapidjson::SizeType j = 0; j < transitions.Size(); ++j) {
+            const auto& transition_json = transitions[j];
+            if (!transition_json.IsObject() || !transition_json.HasMember("type") ||
+                !transition_json["type"].IsString() || !transition_json.HasMember("toStates") ||
+                !transition_json["toStates"].IsArray() || !transition_json.HasMember("activityNames") ||
+                !transition_json["activityNames"].IsArray()) {
+                return Status::JsonFormatError(
+                        "NFA transitions must be objects with a string type and arrays of toStates and activityNames");
+            }
             std::unique_ptr<NFA::Transition> transition = std::make_unique<NFA::Transition>();
-            ASSIGN_OR_RETURN(transition->type, type_from_string(transitions[j]["type"].GetString()));
+            const auto& type = transition_json["type"];
+            ASSIGN_OR_RETURN(transition->type, type_from_string(std::string(type.GetString(), type.GetStringLength())));
             const rapidjson::Value& to_states = transitions[j]["toStates"];
             for (rapidjson::SizeType k = 0; k < to_states.Size(); ++k) {
+                if (!is_valid_state(to_states[k])) {
+                    return Status::JsonFormatError("NFA toStates entries must be integers in [0, states.size())");
+                }
                 transition->to_states.push_back(to_states[k].GetInt());
             }
             const rapidjson::Value& activity_names = transitions[j]["activityNames"];
             for (rapidjson::SizeType k = 0; k < activity_names.Size(); ++k) {
-                transition->activity_names.insert(Slice(activity_names[k].GetString()));
+                if (!activity_names[k].IsString()) {
+                    return Status::JsonFormatError("NFA activityNames entries must be strings");
+                }
+                transition->activity_names.insert(
+                        Slice(activity_names[k].GetString(), activity_names[k].GetStringLength()));
             }
             if (transition->type == NFA::LIKE) {
                 RE2::Options opts;
@@ -280,16 +314,14 @@ Status CelonisMatchProcess::match_process_prepare(FunctionContext* context, Func
         return Status::OK();
     }
     const auto json_input = context->get_constant_column(1);
-    auto* state = new MatchProcessState();
+    auto state = std::make_unique<MatchProcessState>();
     std::string json = ColumnHelper::get_const_value<TYPE_VARCHAR>(json_input).to_string();
-    StatusOr<std::unique_ptr<NFA>> nfa_status = from_json(state, json);
+    StatusOr<std::unique_ptr<NFA>> nfa_status = from_json(state.get(), json);
     if (!nfa_status.ok()) {
-        std::stringstream error;
-        error << "can't parse JSON specification in celonis_match_process" << std::endl;
-        throw std::runtime_error(error.str());
+        return nfa_status.status().clone_and_prepend("Invalid JSON specification in celonis_match_process: ");
     }
     state->nfa = std::move(nfa_status.value());
-    context->set_function_state(scope, state);
+    context->set_function_state(scope, state.release());
 
     return Status::OK();
 }
