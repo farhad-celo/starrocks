@@ -17,6 +17,7 @@ template <LogicalType LT, LogicalType StepLT>
 class CelonisGenerateRange final : public TableFunction {
     struct MyState final : public TableFunctionState {
         size_t total_rows_generated_count = 0;
+        int64_t max_rows = 0;
         ~MyState() override = default;
 
         void on_new_params() override {
@@ -35,7 +36,14 @@ public:
 
     Status prepare(TableFunctionState* /*state*/) const override { return Status::OK(); }
 
-    Status open(RuntimeState* /*runtime_state*/, TableFunctionState* /*state*/) const override { return Status::OK(); }
+    Status open(RuntimeState* /*runtime_state*/, TableFunctionState* base_state) const override {
+        auto state = down_cast<MyState*>(base_state);
+        state->max_rows = config::celonis_generate_range_max_rows;
+        if (state->max_rows <= 0) {
+            return Status::InvalidArgument("celonis_generate_range_max_rows must be positive");
+        }
+        return Status::OK();
+    }
 
     Status close(RuntimeState* /*runtime_state*/, TableFunctionState* state) const override {
         delete state;
@@ -86,6 +94,12 @@ public:
                 auto limit_value = has_limit_arg ? arg_limit->value(curr_row) : DEFAULT_GENERATED_ROWS_LIMIT;
                 if (limit_value <= 0) {
                     state->set_status(Status::InvalidArgument("limit must be positive"));
+                    break;
+                }
+                if (limit_value > state->max_rows) {
+                    state->set_status(Status::InvalidArgument(
+                            "CELONIS_GENERATE_RANGE: limit " + std::to_string(limit_value) +
+                            " exceeds celonis_generate_range_max_rows (" + std::to_string(state->max_rows) + ")."));
                     break;
                 }
                 auto rows_limit = static_cast<size_t>(limit_value);

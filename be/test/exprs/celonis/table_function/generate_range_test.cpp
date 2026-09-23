@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <limits>
+
 #include "column/column_helper.h"
 #include "common/config.h"
 #include "testutil/assert.h"
@@ -18,16 +20,17 @@ protected:
     };
 
     void SetUp() override {
+        original_max_rows_ = config::celonis_generate_range_max_rows;
         rt_state_ = std::make_unique<RuntimeState>();
         rt_state_->set_chunk_size(4096);
     }
 
-    void TearDown() override {}
+    void TearDown() override { config::celonis_generate_range_max_rows = original_max_rows_; }
 
     template <LogicalType LT, LogicalType STEP_LT>
     std::tuple<TableFunctionState*, std::unique_ptr<TableFunction>> Prepare(
-            const std::vector<TestCase>& test_cases,
-            int64_t limit = static_cast<int64_t>(DEFAULT_GENERATED_ROWS_LIMIT)) {
+            const std::vector<TestCase>& test_cases, int64_t limit = static_cast<int64_t>(DEFAULT_GENERATED_ROWS_LIMIT),
+            bool has_limit_arg = true) {
         auto step = ColumnHelper::create_column(TypeDescriptor::from_logical_type(STEP_LT), true);
         auto range_start = ColumnHelper::create_column(TypeDescriptor::from_logical_type(LT), true);
         auto range_end = ColumnHelper::create_column(TypeDescriptor::from_logical_type(LT), true);
@@ -45,12 +48,26 @@ protected:
         input.push_back(step);
         input.push_back(range_start);
         input.push_back(range_end);
-        input.push_back(limit_col);
+        if (has_limit_arg) {
+            input.push_back(limit_col);
+        }
         EXPECT_OK(function->init({}, &table_state));
         table_state->set_params(input);
         EXPECT_OK(function->prepare(table_state));
+        EXPECT_OK(function->open(rt_state_.get(), table_state));
 
         return {table_state, std::move(function)};
+    }
+
+    template <LogicalType LT, LogicalType STEP_LT>
+    void CheckRejectedLimit(const std::vector<TestCase>& test_cases, int64_t limit, bool has_limit_arg = true) {
+        auto [table_state, function] = Prepare<LT, STEP_LT>(test_cases, limit, has_limit_arg);
+        auto [results, offsets] = function->process(rt_state_.get(), table_state);
+        EXPECT_EQ(results[0]->size(), 0);
+        EXPECT_EQ(table_state->processed_rows(), 0);
+        EXPECT_TRUE(table_state->status().is_invalid_argument());
+        EXPECT_NE(table_state->status().to_string().find("exceeds celonis_generate_range_max_rows"), std::string::npos);
+        function->close(nullptr, table_state);
     }
 
     template <LogicalType LT>
@@ -98,6 +115,7 @@ protected:
     }
 
 private:
+    int64_t original_max_rows_ = 0;
     std::unique_ptr<RuntimeState> rt_state_;
 };
 
@@ -183,6 +201,7 @@ TEST_F(CelonisGenerateRangeTest, bigint_start_greater_than_end) {
 }
 
 TEST_F(CelonisGenerateRangeTest, bigint_custom_limit) {
+    config::celonis_generate_range_max_rows = 4;
     const auto LT = TYPE_BIGINT;
     std::vector<TestCase> test_cases{{1L, 1L, 100L, {1L, 2L, 3L}}};
 
@@ -195,6 +214,7 @@ TEST_F(CelonisGenerateRangeTest, bigint_custom_limit) {
 }
 
 TEST_F(CelonisGenerateRangeTest, datetime_custom_limit) {
+    config::celonis_generate_range_max_rows = 4;
     const auto LT = TYPE_DATETIME;
     const auto STEP_LT = TYPE_VARCHAR;
     std::vector<TestCase> test_cases{
@@ -218,6 +238,121 @@ TEST_F(CelonisGenerateRangeTest, bigint_negative_limit) {
     EXPECT_EQ(results[0]->size(), 0);
     ASSERT_TRUE(table_state->status().is_invalid_argument());
     function->close(nullptr, table_state);
+}
+
+TEST_F(CelonisGenerateRangeTest, bigint_server_limit_across_chunks_and_rows) {
+    config::celonis_generate_range_max_rows = 4;
+    rt_state_->set_chunk_size(2);
+    for (int64_t end : {3, 4, 5}) {
+        // Count both input rows together, including when an output chunk ends exactly at the limit.
+        std::vector<TestCase> test_cases{{1L, 1L, 1L, {}}, {1L, 2L, end, {}}};
+        auto [table_state, function] = Prepare<TYPE_BIGINT, TYPE_BIGINT>(test_cases, /*limit=*/4);
+        auto [first, first_offsets] = function->process(rt_state_.get(), table_state);
+        Evaluate<TYPE_BIGINT>(first[0], {1L, 2L});
+        EXPECT_OK(table_state->status());
+        auto [second, second_offsets] = function->process(rt_state_.get(), table_state);
+        Evaluate<TYPE_BIGINT>(second[0], end == 3 ? DatumArray{3L} : DatumArray{3L, 4L});
+        EXPECT_OK(table_state->status());
+        if (end > 4) {
+            auto [third, third_offsets] = function->process(rt_state_.get(), table_state);
+            EXPECT_EQ(third[0]->size(), 0);
+            EXPECT_TRUE(table_state->status().is_invalid_argument());
+            EXPECT_NE(table_state->status().to_string().find("limit of 4"), std::string::npos);
+        } else {
+            EXPECT_EQ(table_state->processed_rows(), 2);
+        }
+        function->close(nullptr, table_state);
+    }
+}
+
+TEST_F(CelonisGenerateRangeTest, datetime_server_limit) {
+    config::celonis_generate_range_max_rows = 4;
+    rt_state_->set_chunk_size(3);
+    for (int end : {4, 5}) {
+        std::vector<TestCase> test_cases{
+                {"1D", TimestampValue::create(2024, 1, 1, 0, 0, 0), TimestampValue::create(2024, 1, end, 0, 0, 0), {}}};
+        auto [table_state, function] = Prepare<TYPE_DATETIME, TYPE_VARCHAR>(test_cases, /*limit=*/4);
+        auto [first, first_offsets] = function->process(rt_state_.get(), table_state);
+        EXPECT_EQ(first[0]->size(), 3);
+        EXPECT_OK(table_state->status());
+        auto [second, second_offsets] = function->process(rt_state_.get(), table_state);
+        EXPECT_EQ(second[0]->size(), 1);
+        if (end > 4) {
+            EXPECT_TRUE(table_state->status().is_invalid_argument());
+        } else {
+            EXPECT_OK(table_state->status());
+            EXPECT_EQ(table_state->processed_rows(), 1);
+        }
+        function->close(nullptr, table_state);
+    }
+}
+
+TEST_F(CelonisGenerateRangeTest, oversized_limit_rejected_before_generation) {
+    config::celonis_generate_range_max_rows = 4;
+    for (int64_t limit : {int64_t{5}, std::numeric_limits<int64_t>::max()}) {
+        for (int end : {3, 6}) {
+            CheckRejectedLimit<TYPE_BIGINT, TYPE_BIGINT>({{1L, 1L, static_cast<int64_t>(end), {}}}, limit);
+            CheckRejectedLimit<TYPE_DATETIME, TYPE_VARCHAR>({{"1D",
+                                                              TimestampValue::create(2024, 1, 1, 0, 0, 0),
+                                                              TimestampValue::create(2024, 1, end, 0, 0, 0),
+                                                              {}}},
+                                                            limit);
+        }
+    }
+    CheckRejectedLimit<TYPE_DATETIME, TYPE_VARCHAR>(
+            {{"1D", TimestampValue::create(2024, 1, 1, 0, 0, 0), TimestampValue::create(2024, 1, 3, 0, 0, 0), {}}},
+            DEFAULT_GENERATED_ROWS_LIMIT, /*has_limit_arg=*/false);
+}
+
+TEST_F(CelonisGenerateRangeTest, default_limit_and_server_limit) {
+    for (int64_t max_rows : {int64_t{3}, DEFAULT_GENERATED_ROWS_LIMIT + 1}) {
+        config::celonis_generate_range_max_rows = max_rows;
+        for (bool has_limit_arg : {false, true}) {
+            std::vector<TestCase> test_cases{{1L, 1L, DEFAULT_GENERATED_ROWS_LIMIT + 1, {}}};
+            auto [table_state, function] =
+                    Prepare<TYPE_BIGINT, TYPE_BIGINT>(test_cases, DEFAULT_GENERATED_ROWS_LIMIT, has_limit_arg);
+            size_t total_rows = 0;
+            // At most three chunks are needed to hit the default limit of 10,000.
+            for (int i = 0; i < 3 && table_state->status().ok(); ++i) {
+                auto [results, offsets] = function->process(rt_state_.get(), table_state);
+                total_rows += results[0]->size();
+            }
+            EXPECT_EQ(total_rows, max_rows < DEFAULT_GENERATED_ROWS_LIMIT ? 0 : DEFAULT_GENERATED_ROWS_LIMIT);
+            EXPECT_TRUE(table_state->status().is_invalid_argument());
+            function->close(nullptr, table_state);
+        }
+    }
+}
+
+TEST_F(CelonisGenerateRangeTest, server_limit_snapshot_and_input_batch_reset) {
+    config::celonis_generate_range_max_rows = 4;
+    std::vector<TestCase> test_cases{{1L, 1L, 4L, {1L, 2L, 3L, 4L}}};
+    auto [table_state, function] = Prepare<TYPE_BIGINT, TYPE_BIGINT>(test_cases, /*limit=*/4);
+    config::celonis_generate_range_max_rows = 1;
+    for (int i = 0; i < 2; ++i) {
+        table_state->set_params(table_state->get_columns());
+        auto [results, offsets] = function->process(rt_state_.get(), table_state);
+        Evaluate<TYPE_BIGINT>(results[0], test_cases);
+        EXPECT_OK(table_state->status());
+    }
+    function->close(nullptr, table_state);
+
+    auto [new_state, new_function] = Prepare<TYPE_BIGINT, TYPE_BIGINT>(test_cases, /*limit=*/4);
+    auto [results, offsets] = new_function->process(rt_state_.get(), new_state);
+    EXPECT_EQ(results[0]->size(), 0);
+    EXPECT_TRUE(new_state->status().is_invalid_argument());
+    new_function->close(nullptr, new_state);
+}
+
+TEST_F(CelonisGenerateRangeTest, invalid_server_limit) {
+    for (int64_t max_rows : {0, -1}) {
+        config::celonis_generate_range_max_rows = max_rows;
+        CelonisGenerateRange<TYPE_BIGINT, TYPE_BIGINT> function;
+        TableFunctionState* table_state = nullptr;
+        ASSERT_OK(function.init({}, &table_state));
+        EXPECT_TRUE(function.open(rt_state_.get(), table_state).is_invalid_argument());
+        function.close(nullptr, table_state);
+    }
 }
 
 TEST_F(CelonisGenerateRangeTest, datetime) {
