@@ -65,7 +65,7 @@ public class UnionDictionaryManager {
             // Celonis
             FunctionSet.CELONIS_SHORTENED_VARIANT, FunctionSet.CELONIS_ARRAY_FIRST, FunctionSet.CELONIS_ARRAY_LAST,
             FunctionSet.CELONIS_ARRAY_LAG, FunctionSet.CELONIS_ARRAY_LEAD, FunctionSet.CELONIS_CALC_CROP_TO_NULL,
-            FunctionSet.CELONIS_NULL_TO_EMPTY,
+            FunctionSet.CELONIS_NULL_TO_EMPTY, FunctionSet.CELONIS_ARRAY_SOURCES, FunctionSet.CELONIS_ARRAY_TARGETS,
             FunctionSet.CELONIS_SORTED_FIRST, FunctionSet.CELONIS_SORTED_LAST);
 
     public UnionDictionaryManager(SessionVariable sessionVariable,
