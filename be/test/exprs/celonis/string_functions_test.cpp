@@ -1527,6 +1527,75 @@ TEST_F(CelonisStringFunctionsTest, translate_upper_utf8) {
     translate(columns, {"AOUZÄÖÜ", "Ü Ö Ä A O U Z", "0ÄÄA 0ÖÖO 0ÜÜU ZZ"});
 }
 
+// A truncated or invalid UTF-8 lead byte declares more bytes than actually remain in the row. A
+// BinaryColumn keeps every row's bytes in one contiguous buffer, so copying the declared width used
+// to walk out of the current row and emit the following row's bytes as part of the result. Each row
+// with a malformed tail below is followed by a row of 'Z's, so an over-read surfaces as leaked 'Z's.
+TEST_F(CelonisStringFunctionsTest, translate_truncated_utf8_does_not_over_read) {
+    // {input, expected}: every truncated lead byte must be copied as the single byte it really is.
+    const std::vector<std::pair<std::string, std::string>> cases = {
+            {"a\xC3", "a\xC3"},                 // 2-byte lead, 1 byte left
+            {"a\xE4", "a\xE4"},                 // 3-byte lead, 1 byte left
+            {"a\xE4\xB8", "a\xE4\xB8"},         // 3-byte lead, 2 bytes left
+            {"a\xF0", "a\xF0"},                 // 4-byte lead, 1 byte left
+            {"a\xF0\x9F\x98", "a\xF0\x9F\x98"}, // 4-byte lead, 3 bytes left
+            {"\xF4", "\xF4"},                   // lone truncated lead byte
+    };
+
+    auto str = BinaryColumn::create();
+    std::vector<std::string> expected;
+    for (const auto& [input, want] : cases) {
+        str->append(input);
+        expected.emplace_back(want);
+        str->append("ZZZZ");
+        expected.emplace_back("ZZZZ");
+    }
+
+    Columns columns;
+    columns.emplace_back(str);
+    // A mapping that matches nothing in the input, so every character takes the verbatim-copy path.
+    columns.emplace_back(ColumnHelper::create_const_column<TYPE_VARCHAR>("0", 1));
+    columns.emplace_back(ColumnHelper::create_const_column<TYPE_VARCHAR>("x", 1));
+
+    translate(columns, expected);
+}
+
+// The same clamping is needed when building the mapping in translate_prepare: the pattern literal
+// "\xE4" declares three bytes but holds one, which used to over-read the literal's own buffer and
+// leave the pattern/replacement lengths looking mismatched.
+TEST_F(CelonisStringFunctionsTest, translate_prepare_truncated_utf8_pattern) {
+    Columns columns;
+
+    auto str = BinaryColumn::create();
+    str->append("a\xE4");
+    str->append("ZZZZ");
+    columns.emplace_back(str);
+    columns.emplace_back(ColumnHelper::create_const_column<TYPE_VARCHAR>("\xE4", 1));
+    columns.emplace_back(ColumnHelper::create_const_column<TYPE_VARCHAR>("Q", 1));
+
+    translate(columns, {"aQ", "ZZZZ"});
+}
+
+// Clamping must not weaken the length check: a genuine pattern/replacement mismatch is still an error.
+TEST_F(CelonisStringFunctionsTest, translate_prepare_rejects_unequal_lengths) {
+    Columns columns;
+
+    auto str = BinaryColumn::create();
+    str->append("abc");
+    columns.emplace_back(str);
+    columns.emplace_back(ColumnHelper::create_const_column<TYPE_VARCHAR>("abc", 1));
+    columns.emplace_back(ColumnHelper::create_const_column<TYPE_VARCHAR>("xy", 1));
+
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    auto* context = ctx.get();
+    context->set_constant_columns(columns);
+
+    EXPECT_FALSE(CelonisStringFunctions::translate_prepare(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                         .ok());
+    ASSERT_TRUE(
+            CelonisStringFunctions::translate_close(context, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL).ok());
+}
+
 TEST(CelonisStringFunctionsSanitizeStringTest, Simple) {
     constexpr const char* VALID_STR{"ßäöü asdfinasodf2 ifu 8we9fdfn k298e7"};
 
@@ -1576,6 +1645,60 @@ TEST(CelonisStringFunctionsSanitizeStringTest, NullTerminated) {
     EXPECT_EQ(v->get(1).get_slice(), "abc");
     EXPECT_EQ(v->get(2).get_slice(), "");
     EXPECT_EQ(v->get(3).get_slice(), "Invalid ? and ");
+}
+
+// The empty-delimiter branch of string_split slices out a single UTF-8 character. A truncated or
+// invalid lead byte declares more bytes than remain in the row, and returning a slice of the declared
+// width used to reach past the row's end into the next row's bytes (rows share one contiguous buffer
+// in a BinaryColumn). Every malformed row below is followed by a row of 'Z's so a leak is visible.
+TEST(CelonisStringFunctionsStringSplitTest, TruncatedUtf8DoesNotOverRead) {
+    struct Case {
+        std::string haystack;
+        int32_t part_number;
+        std::string expected;
+    };
+    const std::vector<Case> cases = {
+            // Positive part numbers scan from the left; the returned character is the malformed tail.
+            {std::string("a\xC3"), 1, std::string("\xC3")},                 // 2-byte lead, 1 byte left
+            {std::string("a\xE4"), 1, std::string("\xE4")},                 // 3-byte lead, 1 byte left
+            {std::string("a\xE4\xB8"), 1, std::string("\xE4\xB8")},         // 3-byte lead, 2 bytes left
+            {std::string("a\xF0"), 1, std::string("\xF0")},                 // 4-byte lead, 1 byte left
+            {std::string("a\xF0\x9F\x98"), 1, std::string("\xF0\x9F\x98")}, // 4-byte lead, 3 bytes left
+            // Negative part numbers index the character offsets from the right.
+            {std::string("a\xE4"), -1, std::string("\xE4")},
+            {std::string("a\xE4\xB8"), -1, std::string("\xE4\xB8")},
+            {std::string("a\xE4") + "b", -1, std::string("\xE4") + "b"}, // b treats as part of the 3-byte from \xE4
+            {std::string("a\xF0\x9F\x98"), -1, std::string("\xF0\x9F\x98")},
+            {std::string("\xF4"), -1, std::string("\xF4")},
+    };
+
+    auto string = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    auto pattern = ColumnHelper::create_column(TypeDescriptor(TYPE_VARCHAR), true);
+    auto index = ColumnHelper::create_column(TypeDescriptor(TYPE_INT), true);
+    for (const auto& c : cases) {
+        string->append_datum(Slice(c.haystack));
+        pattern->append_datum(Slice(""));
+        index->append_datum(c.part_number);
+        // Guard row: any over-read of the preceding row lands in these bytes.
+        string->append_datum(Slice("ZZZZ"));
+        pattern->append_datum(Slice(""));
+        index->append_datum(0);
+    }
+
+    std::unique_ptr<FunctionContext> ctx(FunctionContext::create_test_context());
+    const auto result = CelonisStringFunctions::string_split(ctx.get(), {string, pattern, index}).value();
+
+    ASSERT_EQ(string->size(), result->size());
+    const auto v = ColumnHelper::as_column<NullableColumn>(result);
+    for (size_t i = 0; i < cases.size(); ++i) {
+        const size_t row = 2 * i;
+        auto debug_string = [&]() {
+            return fmt::format("case: {}, haystack bytes: {}, index: {}", i, cases[i].haystack.size(),
+                               cases[i].part_number);
+        };
+        ASSERT_FALSE(v->is_null(row)) << debug_string();
+        EXPECT_EQ(cases[i].expected, v->get(row).get_slice().to_string()) << debug_string();
+    }
 }
 
 TEST(CelonisStringFunctionsStringSplitTest, All) {

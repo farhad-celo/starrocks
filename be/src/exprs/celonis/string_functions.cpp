@@ -52,6 +52,20 @@ static const uint8_t* ASCII_TO_UPPER_MAP = []() {
     return map;
 }();
 
+// Width of the UTF-8 character starting at `p`, clamped to the bytes left before `end`.
+//
+// UTF8_BYTE_LENGTH_TABLE only looks at the lead byte, so a truncated or invalid sequence at the
+// tail of a string can declare more bytes than the buffer actually holds. Advancing or copying by
+// the declared width would then walk past the end of the input, read adjacent heap memory, and (for
+// the functions that copy) emit those bytes as part of a VARCHAR result. Bounding the width by
+// `end - p` keeps every read and copy inside the input; a malformed tail is simply treated as a
+// character of whatever length remains.
+//
+// Callers must guarantee `p < end`.
+inline size_t utf8_char_size_clamped(const char* p, const char* end) {
+    return std::min<size_t>(UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*p)], static_cast<size_t>(end - p));
+}
+
 constexpr std::string_view CELONIS_XX_HASH3_128_V2 = "CELONIS_XX_HASH3_128_V2";
 constexpr std::string_view CELONIS_XX_HASH3_128_V3 = "CELONIS_XX_HASH3_128_V3";
 constexpr std::string_view CELONIS_XX_HASH3_128_V4 = "CELONIS_XX_HASH3_128_V4";
@@ -469,10 +483,10 @@ Status CelonisStringFunctions::translate_prepare(FunctionContext* context, Funct
     const char* pattern_p = pattern_chars.get_data();
     const char* pattern_end = pattern_p + pattern_chars.get_size();
 
-    for (int replace_char_size = 0, pattern_char_size = 0; replace_p < replace_end && pattern_p < pattern_end;
+    for (size_t replace_char_size = 0, pattern_char_size = 0; replace_p < replace_end && pattern_p < pattern_end;
          replace_p += replace_char_size, pattern_p += pattern_char_size) {
-        replace_char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*replace_p)];
-        pattern_char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*pattern_p)];
+        replace_char_size = utf8_char_size_clamped(replace_p, replace_end);
+        pattern_char_size = utf8_char_size_clamped(pattern_p, pattern_end);
 
         state->translate_mapping.emplace(Slice(pattern_p, pattern_char_size), Slice(replace_p, replace_char_size));
     }
@@ -518,10 +532,10 @@ StatusOr<ColumnPtr> CelonisStringFunctions::translate(FunctionContext* context, 
         result_str.clear();
         result_str.reserve(str_value.get_size());
 
-        int char_size = 0;
+        size_t char_size = 0;
         for (const char *str_p = str_value.get_data(), *str_end = str_p + str_value.get_size(); str_p < str_end;
              str_p += char_size) {
-            char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(*str_p)];
+            char_size = utf8_char_size_clamped(str_p, str_end);
 
             const auto cit = translate_mapping.find(Slice(str_p, char_size));
             if (cit == translate_mapping.end()) {
@@ -804,9 +818,10 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
                 if (part_number >= haystack.size) {
                     res.append_null();
                 } else {
-                    int char_size = 0, h = 0;
+                    const char* haystack_end = haystack.data + haystack.size;
+                    size_t char_size = 0, h = 0;
                     for (auto num = 0; h < haystack.size && num < part_number; h += char_size) {
-                        char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<unsigned char>(haystack.data[h])];
+                        char_size = utf8_char_size_clamped(haystack.data + h, haystack_end);
                         ++num;
                     }
                     if (h >= haystack.size) {
@@ -816,23 +831,24 @@ StatusOr<ColumnPtr> CelonisStringFunctions::string_split(FunctionContext* contex
                             res.append_null();
                         }
                     } else {
-                        char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<unsigned char>(haystack.data[h])];
+                        char_size = utf8_char_size_clamped(haystack.data + h, haystack_end);
                         res.append(Slice(haystack.data + h, char_size));
                     }
                 }
             } else {
                 part_number = -part_number;
-                std::vector<int> utf8_char_offsets;
-                int char_size = 0;
-                for (int h = 0; h < haystack.size; h += char_size) {
-                    utf8_char_offsets.push_back(h);
-                    char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<unsigned char>(haystack.data[h])];
+                const char* haystack_end = haystack.data + haystack.size;
+                std::vector<uint32_t> utf8_char_offsets;
+                size_t char_size = 0;
+                for (size_t h = 0; h < haystack.size; h += char_size) {
+                    utf8_char_offsets.push_back(static_cast<uint32_t>(h));
+                    char_size = utf8_char_size_clamped(haystack.data + h, haystack_end);
                 }
                 if (part_number > utf8_char_offsets.size()) {
                     res.append_null();
                 } else {
-                    auto offset = utf8_char_offsets[utf8_char_offsets.size() - part_number];
-                    char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<unsigned char>(haystack.data[offset])];
+                    const uint32_t offset = utf8_char_offsets[utf8_char_offsets.size() - part_number];
+                    char_size = utf8_char_size_clamped(haystack.data + offset, haystack_end);
                     res.append(Slice(haystack.data + offset, char_size));
                 }
             }
