@@ -153,7 +153,8 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                     FunctionSet.SPLIT_PART, FunctionSet.SUBSTR, FunctionSet.SUBSTRING, FunctionSet.SUBSTRING_INDEX,
                     FunctionSet.TRIM, FunctionSet.UPPER, FunctionSet.IF, FunctionSet.LENGTH, FunctionSet.CHAR_LENGTH,
                     FunctionSet.COALESCE, FunctionSet.XX_HASH3_64, FunctionSet.XX_HASH3_128, FunctionSet.STR_TO_DATE,
-                    FunctionSet.MURMUR_HASH3_32, FunctionSet.IFNULL, FunctionSet.STARTS_WITH, FunctionSet.ENDS_WITH);
+                    FunctionSet.MURMUR_HASH3_32, FunctionSet.IFNULL, FunctionSet.STARTS_WITH, FunctionSet.ENDS_WITH,
+                    FunctionSet.REGEXP);
 
     public static final Set<String> CELONIS_LOW_CARD_STRING_FUNCTIONS = ImmutableSet.of(FunctionSet.CELONIS_LOWER,
             FunctionSet.CELONIS_UPPER, FunctionSet.CELONIS_LIKE, FunctionSet.CELONIS_STRING_TO_DOUBLE,
