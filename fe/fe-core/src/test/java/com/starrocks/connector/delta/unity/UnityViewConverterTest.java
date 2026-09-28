@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Collections;
 import java.util.List;
@@ -170,26 +171,17 @@ public class UnityViewConverterTest {
                 ex.getMessage());
     }
 
-    @Test
-    public void testToDeltaLakeViewThrowsWhenColumnsMissing() {
-        TableInfo info = new TableInfo()
-                .setFullName("main.sales.orders_view")
-                .setName("orders_view")
-                .setTableType(TableType.VIEW)
-                .setProperties(ImmutableMap.of(UnityViewConverter.STARROCKS_VIEW_DEFINITION_PROPERTY, "SELECT 1"))
-                .setColumns(Collections.emptyList());
-
-        Assertions.assertThrows(StarRocksConnectorException.class,
-                () -> UnityViewConverter.toDeltaLakeView("unity_demo", "sales", "orders_view", info));
-    }
-
-    @Test
-    public void testToDeltaLakeViewThrowsWhenColumnsAreNull() {
+    @ParameterizedTest(name = "emptyColumns={0}")
+    @ValueSource(booleans = {true, false})
+    public void testToDeltaLakeViewThrowsWhenColumnsMissing(boolean emptyColumns) {
         TableInfo info = new TableInfo()
                 .setFullName("main.sales.orders_view")
                 .setName("orders_view")
                 .setTableType(TableType.VIEW)
                 .setProperties(ImmutableMap.of(UnityViewConverter.STARROCKS_VIEW_DEFINITION_PROPERTY, "SELECT 1"));
+        if (emptyColumns) {
+            info.setColumns(Collections.emptyList());
+        }
 
         StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
                 () -> UnityViewConverter.toDeltaLakeView("unity_demo", "sales", "orders_view", info));

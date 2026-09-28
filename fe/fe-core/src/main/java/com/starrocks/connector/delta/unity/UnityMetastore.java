@@ -31,11 +31,12 @@ import io.unitycatalog.client.delta.model.DeltaLoadTableResponse;
 import io.unitycatalog.client.delta.model.DeltaTableMetadata;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
- * {@link IMetastore} implementation backed by the Databricks Unity Catalog REST API. Used as the
+ * {@link IMetastore} implementation backed by Unity Catalog REST APIs. Used as the
  * delegate inside {@link UnityBackedDeltaMetastore} to list schemas/tables and resolve per-table
  * storage locations (with optional vended credentials). The read path uses the Unity Catalog
  * {@code delta/v1} client for {@code loadTable} and {@code getTableCredentials}.
@@ -162,13 +163,22 @@ public class UnityMetastore implements IMetastore {
 
     /**
      * Resolve the AWS region for vended credentials: the operator override if set, otherwise a
-     * once-per-handle {@code metastore_summary} lookup. Throws when UC exposes no region rather
-     * than defaulting to {@code us-east-1}, which would cause opaque 403s for other regions.
+     * once-per-handle {@code metastore_summary} lookup for Databricks. Other flavors must provide
+     * the override because they do not expose that endpoint. Never default to {@code us-east-1},
+     * which would cause opaque 403s for other regions.
      */
     private String resolveAwsRegion() {
         String override = properties.getAwsRegionOverride();
         if (override != null) {
             return override;
+        }
+        if (properties.getFlavor() != UnityCatalogProperties.Flavor.DATABRICKS) {
+            throw new StarRocksConnectorException(
+                    "Unity Catalog flavor '%s' cannot infer an AWS region because metastore_summary " +
+                            "is only available for Databricks catalogs. Vended credentials for S3 " +
+                            "require a region; set '%s' explicitly on catalog '%s'.",
+                    properties.getFlavor().name().toLowerCase(Locale.ROOT),
+                    UnityCatalogProperties.UNITY_CATALOG_AWS_REGION, properties.getUcCatalogName());
         }
         if (cachedRegion != null) {
             return cachedRegion;

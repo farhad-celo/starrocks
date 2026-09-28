@@ -30,6 +30,7 @@ import com.starrocks.connector.delta.DeltaLakeFileStatus;
 import com.starrocks.connector.delta.DeltaLakeJsonHandler;
 import com.starrocks.connector.delta.DeltaLakeSnapshot;
 import com.starrocks.connector.exception.StarRocksConnectorException;
+import com.starrocks.connector.hadoop.HadoopExt;
 import com.starrocks.connector.metastore.MetastoreTable;
 import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.credential.CloudType;
@@ -729,6 +730,21 @@ public class UnityBackedDeltaMetastoreTest {
                 "the populating principal must see its own cached entry");
         Assertions.assertFalse(cache.containsJson("principal-b", status),
                 "a different principal must never be served a cache entry it did not populate");
+    }
+
+    @Test
+    public void testSharedMetaCacheIsolatesStaticStorageCredentials() {
+        Configuration first = new Configuration(false);
+        first.set(HadoopExt.HADOOP_CLOUD_CONFIGURATION_STRING, "azure-credential-a");
+        Configuration second = new Configuration(false);
+        second.set(HadoopExt.HADOOP_CLOUD_CONFIGURATION_STRING, "azure-credential-b");
+
+        String firstScope = UnityDeltaLakeMetaCache.credentialScope("unity-principal", first, false);
+        String secondScope = UnityDeltaLakeMetaCache.credentialScope("unity-principal", second, false);
+
+        Assertions.assertNotEquals(firstScope, secondScope);
+        Assertions.assertEquals("unity-principal",
+                UnityDeltaLakeMetaCache.credentialScope("unity-principal", first, true));
     }
 
     @Test

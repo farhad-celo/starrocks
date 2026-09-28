@@ -23,9 +23,10 @@ import io.unitycatalog.client.delta.model.DeltaLoadTableResponse;
 import java.util.List;
 
 /**
- * Narrow Unity Catalog surface the Delta Lake connector depends on. Schema/table discovery and the
- * metastore summary use Databricks SDK model types; the read path ({@link #loadTable},
- * {@link #getTableCredentials}) goes through the Unity Catalog {@code delta/v1} client.
+ * Narrow Unity Catalog surface the Delta Lake connector depends on. Schema/table discovery is
+ * exposed through Databricks SDK model types, but the concrete client may fetch it through either
+ * the Databricks SDK or the generated Unity Catalog client. Table loading uses either the Unity
+ * Catalog {@code delta/v1} extension or standard get-table metadata, depending on the flavor.
  */
 public interface UnityCatalogApi {
 

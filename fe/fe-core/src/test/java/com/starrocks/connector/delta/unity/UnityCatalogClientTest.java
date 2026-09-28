@@ -17,6 +17,8 @@ package com.starrocks.connector.delta.unity;
 import com.databricks.sdk.WorkspaceClient;
 import com.databricks.sdk.core.DatabricksException;
 import com.databricks.sdk.core.error.platform.NotFound;
+import com.databricks.sdk.service.catalog.ColumnInfo;
+import com.databricks.sdk.service.catalog.ColumnTypeName;
 import com.databricks.sdk.service.catalog.DataSourceFormat;
 import com.databricks.sdk.service.catalog.GetMetastoreSummaryResponse;
 import com.databricks.sdk.service.catalog.ListSchemasRequest;
@@ -25,6 +27,7 @@ import com.databricks.sdk.service.catalog.MetastoresAPI;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.SchemasAPI;
 import com.databricks.sdk.service.catalog.TableInfo;
+import com.databricks.sdk.service.catalog.TableType;
 import com.databricks.sdk.service.catalog.TablesAPI;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -32,11 +35,16 @@ import com.starrocks.connector.delta.DeltaLakeTableNotFoundException;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import io.unitycatalog.client.ApiClient;
 import io.unitycatalog.client.ApiException;
+import io.unitycatalog.client.api.SchemasApi;
+import io.unitycatalog.client.api.TablesApi;
+import io.unitycatalog.client.auth.TokenProvider;
 import io.unitycatalog.client.delta.api.DeltaTablesApi;
 import io.unitycatalog.client.delta.api.DeltaTemporaryCredentialsApi;
 import io.unitycatalog.client.delta.model.DeltaCredentialOperation;
 import io.unitycatalog.client.delta.model.DeltaCredentialsResponse;
 import io.unitycatalog.client.delta.model.DeltaLoadTableResponse;
+import io.unitycatalog.client.model.ListSchemasResponse;
+import io.unitycatalog.client.model.ListTablesResponse;
 import mockit.Expectations;
 import mockit.Mocked;
 import mockit.Verifications;
@@ -46,10 +54,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 public class UnityCatalogClientTest {
@@ -108,6 +118,291 @@ public class UnityCatalogClientTest {
                 Assertions.assertEquals("sales", captured.getSchemaName());
             }
         };
+    }
+
+    @Test
+    public void testListSchemasDelegatesToOssClient(@Mocked WorkspaceClient ws,
+                                                    @Mocked SchemasApi schemasApi,
+                                                    @Mocked TablesApi tablesApi,
+                                                    @Mocked DeltaTablesApi deltaTablesApi,
+                                                    @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        io.unitycatalog.client.model.SchemaInfo s1 = new io.unitycatalog.client.model.SchemaInfo()
+                .name("sales")
+                .catalogName("main")
+                .storageLocation("s3://bucket/sales");
+        io.unitycatalog.client.model.SchemaInfo s2 = new io.unitycatalog.client.model.SchemaInfo()
+                .name("marketing")
+                .catalogName("main");
+        new Expectations() {
+            {
+                try {
+                    schemasApi.listSchemas("main", null, null);
+                    result = new ListSchemasResponse().addSchemasItem(s1).nextPageToken("next");
+                    schemasApi.listSchemas("main", null, "next");
+                    result = new ListSchemasResponse().addSchemasItem(s2);
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = ossFlavorClient(ws, schemasApi, tablesApi, deltaTablesApi, deltaCredentialsApi);
+        List<SchemaInfo> result = client.listSchemas("main");
+        Assertions.assertEquals(2, result.size());
+        Assertions.assertEquals("sales", result.get(0).getName());
+        Assertions.assertEquals("s3://bucket/sales", result.get(0).getStorageLocation());
+        Assertions.assertEquals("marketing", result.get(1).getName());
+
+        new Verifications() {
+            {
+                ws.schemas();
+                times = 0;
+            }
+        };
+    }
+
+    @Test
+    public void testListTablesDelegatesToOssClient(@Mocked WorkspaceClient ws,
+                                                   @Mocked SchemasApi schemasApi,
+                                                   @Mocked TablesApi tablesApi,
+                                                   @Mocked DeltaTablesApi deltaTablesApi,
+                                                   @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        io.unitycatalog.client.model.TableInfo t1 = new io.unitycatalog.client.model.TableInfo()
+                .name("orders")
+                .catalogName("main")
+                .schemaName("sales")
+                .tableId("tbl-1")
+                .tableType(io.unitycatalog.client.model.TableType.EXTERNAL)
+                .dataSourceFormat(io.unitycatalog.client.model.DataSourceFormat.DELTA);
+        io.unitycatalog.client.model.TableInfo t2 = new io.unitycatalog.client.model.TableInfo()
+                .name("parquet_tbl")
+                .catalogName("main")
+                .schemaName("sales")
+                .tableType(io.unitycatalog.client.model.TableType.MANAGED)
+                .dataSourceFormat(io.unitycatalog.client.model.DataSourceFormat.PARQUET);
+        new Expectations() {
+            {
+                try {
+                    tablesApi.listTables("main", "sales", null, null);
+                    result = new ListTablesResponse().addTablesItem(t1).nextPageToken("next");
+                    tablesApi.listTables("main", "sales", null, "next");
+                    result = new ListTablesResponse().addTablesItem(t2);
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = ossFlavorClient(ws, schemasApi, tablesApi, deltaTablesApi, deltaCredentialsApi);
+        List<TableInfo> result = client.listTables("main", "sales");
+        Assertions.assertEquals(2, result.size(), "client must not filter by data_source_format");
+        Assertions.assertEquals("main.sales.orders", result.get(0).getFullName());
+        Assertions.assertEquals(TableType.EXTERNAL, result.get(0).getTableType());
+        Assertions.assertEquals(DataSourceFormat.DELTA, result.get(0).getDataSourceFormat());
+        Assertions.assertEquals(DataSourceFormat.PARQUET, result.get(1).getDataSourceFormat());
+
+        new Verifications() {
+            {
+                ws.tables();
+                times = 0;
+            }
+        };
+    }
+
+    @ParameterizedTest(name = "{1}")
+    @CsvSource({
+            "true,  catalog API failure",
+            "false, OAuth token failure"
+    })
+    public void testOssFlavorListTablesWrapsFailures(boolean apiFailure, String message,
+                                                      @Mocked SchemasApi schemasApi,
+                                                      @Mocked TablesApi tablesApi,
+                                                      @Mocked DeltaTablesApi deltaTablesApi,
+                                                      @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        new Expectations() {
+            {
+                try {
+                    tablesApi.listTables("main", "sales", null, null);
+                    result = apiFailure ? new ApiException(500, message) : new RuntimeException(message);
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = ossFlavorClient(
+                null, schemasApi, tablesApi, deltaTablesApi, deltaCredentialsApi);
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> client.listTables("main", "sales"));
+        Assertions.assertTrue(ex.getMessage().contains("listTables(main.sales)"));
+        Assertions.assertTrue(ex.getMessage().contains(message));
+    }
+
+    @Test
+    public void testListTablesMapsOssViewType(
+            @Mocked SchemasApi schemasApi,
+            @Mocked TablesApi tablesApi,
+            @Mocked DeltaTablesApi deltaTablesApi,
+            @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        io.unitycatalog.client.model.TableInfo viewSummary = new io.unitycatalog.client.model.TableInfo()
+                .name("orders_view")
+                .catalogName("main")
+                .schemaName("sales")
+                .tableType(io.unitycatalog.client.model.TableType.VIEW);
+
+        new Expectations() {
+            {
+                try {
+                    tablesApi.listTables("main", "sales", null, null);
+                    result = new ListTablesResponse().addTablesItem(viewSummary);
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = ossFlavorClient(
+                null, schemasApi, tablesApi, deltaTablesApi, deltaCredentialsApi);
+        List<TableInfo> result = client.listTables("main", "sales");
+
+        Assertions.assertEquals(1, result.size());
+        Assertions.assertEquals(TableType.VIEW, result.get(0).getTableType());
+    }
+
+    @Test
+    public void testGetTableInfoDelegatesToOssClient(@Mocked WorkspaceClient ws,
+                                                     @Mocked SchemasApi schemasApi,
+                                                     @Mocked TablesApi tablesApi,
+                                                     @Mocked DeltaTablesApi deltaTablesApi,
+                                                     @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        io.unitycatalog.client.model.TableInfo table = new io.unitycatalog.client.model.TableInfo()
+                .name("orders")
+                .catalogName("main")
+                .schemaName("sales")
+                .tableId("tbl-1")
+                .tableType(io.unitycatalog.client.model.TableType.EXTERNAL)
+                .dataSourceFormat(io.unitycatalog.client.model.DataSourceFormat.DELTA)
+                .addColumnsItem(new io.unitycatalog.client.model.ColumnInfo()
+                        .name("id")
+                        .typeText("INT")
+                        .typeName(io.unitycatalog.client.model.ColumnTypeName.INT)
+                        .typeJson("\"integer\"")
+                        .position(0)
+                        .nullable(false));
+        new Expectations() {
+            {
+                try {
+                    tablesApi.getTable("main.sales.orders", null, null);
+                    result = table;
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = ossFlavorClient(ws, schemasApi, tablesApi, deltaTablesApi, deltaCredentialsApi);
+        TableInfo result = client.getTableInfo("main.sales.orders");
+        Assertions.assertEquals("main.sales.orders", result.getFullName());
+        Assertions.assertEquals("tbl-1", result.getTableId());
+        Assertions.assertEquals(TableType.EXTERNAL, result.getTableType());
+        ColumnInfo column = ImmutableList.copyOf(result.getColumns()).get(0);
+        Assertions.assertEquals("id", column.getName());
+        Assertions.assertEquals(ColumnTypeName.INT, column.getTypeName());
+        Assertions.assertEquals(0L, column.getPosition());
+        Assertions.assertFalse(column.getNullable());
+    }
+
+    @Test
+    public void testGetTableInfoMapsOssViewType(
+            @Mocked SchemasApi schemasApi,
+            @Mocked TablesApi tablesApi,
+            @Mocked DeltaTablesApi deltaTablesApi,
+            @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        io.unitycatalog.client.model.TableInfo view = new io.unitycatalog.client.model.TableInfo()
+                .name("orders_view")
+                .catalogName("main")
+                .schemaName("sales")
+                .tableType(io.unitycatalog.client.model.TableType.VIEW)
+                .viewDefinition("SELECT * FROM sales.orders");
+        new Expectations() {
+            {
+                try {
+                    tablesApi.getTable("main.sales.orders_view", null, null);
+                    result = view;
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = ossFlavorClient(
+                null, schemasApi, tablesApi, deltaTablesApi, deltaCredentialsApi);
+
+        Assertions.assertEquals(TableType.VIEW,
+                client.getTableInfo("main.sales.orders_view").getTableType());
+    }
+
+    @Test
+    public void testTableExistsDelegatesToOssClient(@Mocked WorkspaceClient ws,
+                                                    @Mocked SchemasApi schemasApi,
+                                                    @Mocked TablesApi tablesApi,
+                                                    @Mocked DeltaTablesApi deltaTablesApi,
+                                                    @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        new Expectations() {
+            {
+                try {
+                    tablesApi.getTable("main.sales.orders", null, null);
+                    result = new io.unitycatalog.client.model.TableInfo().name("orders");
+                    tablesApi.getTable("main.sales.missing", null, null);
+                    result = new ApiException(404, "missing");
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = ossFlavorClient(ws, schemasApi, tablesApi, deltaTablesApi, deltaCredentialsApi);
+        Assertions.assertTrue(client.tableExists("main.sales.orders"));
+        Assertions.assertFalse(client.tableExists("main.sales.missing"));
+    }
+
+    @Test
+    public void testOssFlavorListSchemasWrapsRuntimeFailures(
+            @Mocked SchemasApi schemasApi,
+            @Mocked TablesApi tablesApi,
+            @Mocked DeltaTablesApi deltaTablesApi,
+            @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        new Expectations() {
+            {
+                try {
+                    schemasApi.listSchemas("main", null, null);
+                    result = new RuntimeException("Failed to renew OAuth token");
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = ossFlavorClient(null, schemasApi, tablesApi, deltaTablesApi, deltaCredentialsApi);
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> client.listSchemas("main"));
+        Assertions.assertTrue(ex.getMessage().contains("listSchemas(main)"));
+        Assertions.assertTrue(ex.getMessage().contains("Failed to renew OAuth token"));
+    }
+
+    @Test
+    public void testOssFlavorGetMetastoreSummaryFailsWithoutDatabricksSdk(
+            @Mocked SchemasApi schemasApi,
+            @Mocked TablesApi tablesApi,
+            @Mocked DeltaTablesApi deltaTablesApi,
+            @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        UnityCatalogClient client = ossFlavorClient(null, schemasApi, tablesApi, deltaTablesApi, deltaCredentialsApi);
+
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                client::getMetastoreSummary);
+
+        Assertions.assertTrue(ex.getMessage().contains("metastores.summary"));
+        Assertions.assertTrue(ex.getMessage().contains("unity.catalog.flavor=oss"));
     }
 
     private static Stream<Arguments> tableExistsCases() {
@@ -193,6 +488,97 @@ public class UnityCatalogClientTest {
         Assertions.assertSame(resp, client.loadTable("main", "sales", "orders"));
     }
 
+    @ParameterizedTest(name = "tableId=''{0}''")
+    @CsvSource({
+            "11111111-1111-1111-1111-111111111111, true",
+            "not-a-uuid,                           false",
+            "'',                                   false"
+    })
+    public void testFabricLoadTableUsesCatalogGetTable(String rawTableId, boolean validTableId,
+                                                        @Mocked SchemasApi schemasApi,
+                                                        @Mocked TablesApi tablesApi,
+                                                        @Mocked DeltaTablesApi deltaTablesApi,
+                                                        @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        UUID tableId = validTableId ? UUID.fromString(rawTableId) : null;
+        io.unitycatalog.client.model.TableInfo table = new io.unitycatalog.client.model.TableInfo()
+                .catalogName("lakehouse")
+                .schemaName("dbo")
+                .name("orders")
+                .tableId(rawTableId)
+                .dataSourceFormat(io.unitycatalog.client.model.DataSourceFormat.DELTA)
+                .storageLocation("https://onelake.dfs.fabric.microsoft.com/workspace/item/Tables/orders")
+                .createdAt(1_700_000_000_000L)
+                .updatedAt(1_700_000_001_000L);
+        new Expectations() {
+            {
+                try {
+                    tablesApi.getTable("lakehouse.dbo.orders", null, null);
+                    result = table;
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(null, schemasApi, tablesApi,
+                deltaTablesApi, deltaCredentialsApi, UnityCatalogProperties.Flavor.FABRIC);
+        DeltaLoadTableResponse response = client.loadTable("lakehouse", "dbo", "orders");
+
+        Assertions.assertEquals("abfss://workspace@onelake.dfs.fabric.microsoft.com/item/Tables/orders",
+                response.getMetadata().getLocation());
+        Assertions.assertEquals(tableId, response.getMetadata().getTableUuid());
+        Assertions.assertEquals(table.getCreatedAt(), response.getMetadata().getCreatedTime());
+        Assertions.assertTrue(response.getCommits().isEmpty());
+        Assertions.assertNull(response.getLatestTableVersion());
+        new Verifications() {
+            {
+                try {
+                    deltaTablesApi.loadTable(anyString, anyString, anyString);
+                    times = 0;
+                } catch (ApiException e) {
+                    // verification only; not thrown here
+                }
+            }
+        };
+    }
+
+    @Test
+    public void testFabricLoadTablePreservesNotFound(@Mocked SchemasApi schemasApi,
+                                                      @Mocked TablesApi tablesApi,
+                                                      @Mocked DeltaTablesApi deltaTablesApi,
+                                                      @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        new Expectations() {
+            {
+                try {
+                    tablesApi.getTable("lakehouse.dbo.missing", null, null);
+                    result = new ApiException(404, "missing");
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(null, schemasApi, tablesApi,
+                deltaTablesApi, deltaCredentialsApi, UnityCatalogProperties.Flavor.FABRIC);
+        Assertions.assertThrows(DeltaLakeTableNotFoundException.class,
+                () -> client.loadTable("lakehouse", "dbo", "missing"));
+    }
+
+    @ParameterizedTest(name = "location=''{0}''")
+    @ValueSource(strings = {
+            "",
+            "not a valid URI [",
+            "abfss://workspace@account.dfs.core.windows.net/item/Tables/orders",
+            "s3://bucket/orders",
+            "https://example.com/workspace/item",
+            "https:/workspace/item",
+            "https://onelake.dfs.fabric.microsoft.com/workspace",
+            "https://onelake.dfs.fabric.microsoft.com/workspace/"
+    })
+    public void testToOneLakeAbfssUriLeavesOtherLocationsUnchanged(String location) {
+        Assertions.assertEquals(location, UnityCatalogClient.toOneLakeAbfssUri(location));
+    }
+
     @Test
     public void testLoadTableUnavailableWhenDeltaClientMissing(@Mocked WorkspaceClient ws) {
         UnityCatalogClient client = new UnityCatalogClient(ws);
@@ -260,6 +646,30 @@ public class UnityCatalogClientTest {
                 Assertions.assertThrows(UnityCatalogUnsupportedTableFormatException.class,
                         () -> client.loadTable("main", "sales", "orders_view"));
         Assertions.assertTrue(ex.getMessage().contains("loadTable(main.sales.orders_view"));
+    }
+
+    @Test
+    public void testLoadTableMarksUnsupportedTableFormatWhenBodyIsOnlyInMessage(
+            @Mocked WorkspaceClient ws,
+            @Mocked DeltaTablesApi deltaTablesApi,
+            @Mocked DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        new Expectations() {
+            {
+                try {
+                    deltaTablesApi.loadTable("main", "sales", "orders_view");
+                    result = new ApiException(400, "loadTable call failed with: 400 - "
+                            + "{\"error\":{\"message\":\"This table is a view; retrieve its definition "
+                            + "through the Unity SDK endpoint\",\"type\":\"UnsupportedTableFormatException\","
+                            + "\"code\":400,\"stack\":[]}}");
+                } catch (ApiException e) {
+                    // recording only; not thrown here
+                }
+            }
+        };
+
+        UnityCatalogClient client = new UnityCatalogClient(ws, deltaTablesApi, deltaCredentialsApi);
+        Assertions.assertThrows(UnityCatalogUnsupportedTableFormatException.class,
+                () -> client.loadTable("main", "sales", "orders_view"));
     }
 
     @Test
@@ -375,6 +785,41 @@ public class UnityCatalogClientTest {
     }
 
     @Test
+    public void testOssFlavorDoesNotBuildDatabricksWorkspaceClient() {
+        UnityCatalogProperties props = new UnityCatalogProperties(ImmutableMap.<String, String>builder()
+                .put("unity.catalog.host", "http://localhost:1")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.flavor", "oss")
+                .put("unity.catalog.auth.type", "oauth-m2m")
+                .put("unity.catalog.client-id", "client-id")
+                .put("unity.catalog.client-secret", "client-secret")
+                .put("unity.catalog.oauth-token-url", "http://localhost:1/oauth/token")
+                .put("unity.catalog.oauth-scope", "uc.read")
+                .put("unity.catalog.request-timeout-ms", "1")
+                .put("unity.catalog.max-retries", "0")
+                .build());
+        Assertions.assertDoesNotThrow(() -> new UnityCatalogClient(props));
+    }
+
+    @Test
+    public void testOAuthTokenProviderUsesConfiguredEndpointAndScope() {
+        UnityCatalogProperties props = new UnityCatalogProperties(ImmutableMap.<String, String>builder()
+                .put("unity.catalog.host", "http://localhost:1")
+                .put("unity.catalog.name", "main")
+                .put("unity.catalog.flavor", "oss")
+                .put("unity.catalog.auth.type", "oauth-m2m")
+                .put("unity.catalog.client-id", "client-id")
+                .put("unity.catalog.client-secret", "client-secret")
+                .put("unity.catalog.oauth-token-url", "http://localhost:1/oauth2/token")
+                .put("unity.catalog.oauth-scope", "uc.read")
+                .build());
+
+        TokenProvider provider = UnityCatalogClient.tokenProvider(props);
+        Assertions.assertEquals("http://localhost:1/oauth2/token", provider.configs().get("oauth.uri"));
+        Assertions.assertEquals("uc.read", provider.configs().get("oauth.scope"));
+    }
+
+    @Test
     public void testDefaultUserAgentUsesStarRocks() {
         String userAgent = userAgent(propsWithUserAgentSpoof(false));
         Assertions.assertTrue(userAgent.contains("Delta/4.3.0"));
@@ -437,5 +882,14 @@ public class UnityCatalogClientTest {
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(URI.create("https://example.com"));
         client.getRequestInterceptor().accept(requestBuilder);
         return requestBuilder.build().headers().firstValue("User-Agent").orElseThrow();
+    }
+
+    private static UnityCatalogClient ossFlavorClient(WorkspaceClient ws,
+                                                         SchemasApi schemasApi,
+                                                         TablesApi tablesApi,
+                                                         DeltaTablesApi deltaTablesApi,
+                                                         DeltaTemporaryCredentialsApi deltaCredentialsApi) {
+        return new UnityCatalogClient(ws, schemasApi, tablesApi, deltaTablesApi, deltaCredentialsApi,
+                UnityCatalogProperties.Flavor.OSS);
     }
 }

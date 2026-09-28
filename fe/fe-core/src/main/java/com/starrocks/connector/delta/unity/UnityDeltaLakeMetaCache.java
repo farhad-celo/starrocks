@@ -21,6 +21,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
+import com.google.common.hash.Hashing;
 import com.starrocks.common.Pair;
 import com.starrocks.connector.delta.DeltaLakeCacheSizeEstimator;
 import com.starrocks.connector.delta.DeltaLakeCatalogProperties;
@@ -29,10 +30,12 @@ import com.starrocks.connector.delta.DeltaLakeFileStatus;
 import com.starrocks.connector.delta.DeltaLakeJsonHandler;
 import com.starrocks.connector.delta.DeltaLakeParquetHandler;
 import com.starrocks.connector.delta.DeltaVendedFsScope;
+import com.starrocks.connector.hadoop.HadoopExt;
 import io.delta.kernel.data.ColumnarBatch;
 import io.delta.kernel.types.StructType;
 import org.apache.hadoop.conf.Configuration;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,11 +46,10 @@ import java.util.stream.Collectors;
 /**
  * Process-wide Delta metadata cache for Unity catalogs.
  *
- * <p>Entries are keyed on {@code (principalScope, file identity)} so a hit is only ever served to
- * callers within the same Unity principal boundary; a different principal misses and loads under
- * its own vended credentials. Per-table credentials reach the loader through the scoped views
- * returned by {@link #getCheckpointCache(String, Configuration, boolean)} / {@link #getJsonCache(String,
- * Configuration, boolean)}.</p>
+ * <p>Entries are keyed on {@code (credentialScope, file identity)} so a hit is only ever served to
+ * callers within the same Unity and storage credential boundary. Per-table credentials reach the
+ * loader through the scoped views returned by {@link #getCheckpointCache(String, Configuration,
+ * boolean)} / {@link #getJsonCache(String, Configuration, boolean)}.</p>
  *
  * <p>Sized once from {@link UnityDeltaLakeMetaCacheConfig} on first use; restart the FE to
  * change TTLs or memory-usage ratios.</p>
@@ -93,9 +95,22 @@ public class UnityDeltaLakeMetaCache {
 
     DeltaLakeEngine createEngine(String principalScope, Configuration hadoopConfiguration,
                                  DeltaLakeCatalogProperties properties, boolean vendedCredentials) {
+        String credentialScope = credentialScope(principalScope, hadoopConfiguration, vendedCredentials);
         return DeltaLakeEngine.create(hadoopConfiguration, properties,
-                getCheckpointCache(principalScope, hadoopConfiguration, vendedCredentials),
-                getJsonCache(principalScope, hadoopConfiguration, vendedCredentials), false);
+                getCheckpointCache(credentialScope, hadoopConfiguration, vendedCredentials),
+                getJsonCache(credentialScope, hadoopConfiguration, vendedCredentials), false);
+    }
+
+    @VisibleForTesting
+    static String credentialScope(String principalScope, Configuration hadoopConfiguration,
+                                  boolean vendedCredentials) {
+        if (vendedCredentials) {
+            return principalScope;
+        }
+        String storageIdentity = HadoopExt.getInstance().getCloudConfString(hadoopConfiguration);
+        return Hashing.sha256()
+                .hashString(principalScope + "\u0000" + storageIdentity, StandardCharsets.UTF_8)
+                .toString();
     }
 
     LoadingCache<Pair<DeltaLakeFileStatus, StructType>, List<ColumnarBatch>> getCheckpointCache(

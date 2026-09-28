@@ -1,6 +1,6 @@
-##### Databricks Unity Catalog
+##### Unity Catalog
 
-StarRocks 3.5 supports Databricks Unity Catalog (UC) as a Delta Lake metastore. The FE uses the UC REST API to list metadata, load Delta tables, and optionally vend short-lived table credentials for storage reads.
+StarRocks 3.5 supports the Databricks, OSS, and Microsoft Fabric Unity Catalog (UC) flavors as Delta Lake metastore backends. The FE uses the UC REST API to list metadata, load Delta tables, and optionally vend short-lived table credentials for storage reads.
 
 Configure `MetastoreParams`:
 
@@ -17,13 +17,16 @@ Parameters:
 | Parameter | Required | Description |
 | --------- | -------- | ----------- |
 | hive.metastore.type | Yes | Must be `unity`. |
-| unity.catalog.host | Yes | Databricks workspace URL. Trailing slashes are stripped. |
+| unity.catalog.host | Yes | Unity Catalog API base URL. For `databricks`, use the workspace URL. For `oss`, use the UC server URL. For `fabric`, use `https://onelake.table.fabric.microsoft.com/delta/<workspace-id>/<item-id>`. Trailing slashes are stripped. |
 | unity.catalog.auth.type | No | `pat` (default) or `oauth-m2m`. The credential sets are mutually exclusive. |
 | unity.catalog.token | Conditional | PAT or service-principal token with table access. Required for `pat`; not allowed for `oauth-m2m`. |
 | unity.catalog.client-id | Conditional | Service-principal OAuth client ID. Required for `oauth-m2m`. |
 | unity.catalog.client-secret | Conditional | Service-principal OAuth client secret. Required for `oauth-m2m`. |
+| unity.catalog.oauth-token-url | Conditional | OAuth 2.0 token endpoint used when `unity.catalog.auth.type = oauth-m2m`. Required for `oss` and `fabric` flavors because they rely on an external identity provider. In `databricks` flavor, this defaults to `<unity.catalog.host>/oidc/v1/token`. |
+| unity.catalog.oauth-scope | Conditional | OAuth 2.0 scope requested for M2M token fetches. Required and non-empty for `oss`. Defaults to `all-apis` for `databricks` and `https://storage.azure.com/.default` for `fabric`. |
 | unity.catalog.name | Yes | UC catalog exposed as the StarRocks external catalog. |
-| unity.catalog.vended-credentials-enabled | No | Default `true`. Uses UC `temporary-table-credentials`; failures fail fast in FE. Set `false` to use `StorageCredentialParams`. |
+| unity.catalog.flavor | No | Unity Catalog implementation flavor. Allowed values: `databricks` (default), `oss`, and `fabric`. The `fabric` flavor uses the Unity-compatible schema/table APIs and loads Delta metadata from `GET tables/{full_name}` because OneLake does not expose the UC `delta/v1` API. |
+| unity.catalog.vended-credentials-enabled | No | Default `true`. Uses UC `temporary-table-credentials`; failures fail fast in FE. Must be explicitly set to `false` for Fabric, which does not expose credential vending. |
 | unity.catalog.spoof-user-agent | No | Default `false`. Set `true` to send a Spark-like user agent when StarRocks is not whitelisted. Requires catalog re-creation. |
 | unity.catalog.request-timeout-ms | No | Default `30000`. UC request timeout in milliseconds. |
 | unity.catalog.max-retries | No | Default `3`. UC delta/v1 retries after the initial request. |
@@ -32,7 +35,7 @@ Parameters:
 | unity.catalog.cache.ttl-sec | No | Default `60`. UC metadata TTL; also bounds vended snapshot TTL. `0` bypasses UC metadata and snapshot caches. |
 | unity.catalog.cache.credentials.ttl-sec | No | Default `1200`. TTL for cached vended credentials. `0` disables credential retention. |
 | unity.catalog.cache.credentials.safety-margin-sec | No | Default `1200`. Re-vend before the earliest credential `expirationTime`; credentials without expiration are not cached. |
-| unity.catalog.aws.region | Conditional | Optional AWS region override. Required if AWS vended credentials are enabled and `metastores.summary` cannot return a region. |
+| unity.catalog.aws.region | Conditional | AWS region for vended credentials. Required for `oss` catalogs using S3. For `databricks`, this is an optional override when `metastores.summary` cannot return a region. |
 
 With vended credentials enabled, AWS S3 and Azure ADLS Gen2 can usually omit `StorageCredentialParams`; GCS uses catalog-level credentials.
 
@@ -63,6 +66,32 @@ PROPERTIES (
     "unity.catalog.client-secret" = "<service-principal-oauth-secret>",
     "unity.catalog.name" = "main",
     "unity.catalog.vended-credentials-enabled" = "true"
+);
+```
+
+**Example: Microsoft Fabric OneLake**
+
+Fabric exposes read-only Unity-compatible table metadata and does not vend storage credentials. Configure the
+same service principal for OneLake storage access using the standard ADLS2 properties. The ADLS2 client endpoint
+uses the OAuth v1 path expected by the Hadoop ABFS client.
+
+```SQL
+CREATE EXTERNAL CATALOG fabric_delta
+PROPERTIES (
+    "type" = "deltalake",
+    "hive.metastore.type" = "unity",
+    "unity.catalog.flavor" = "fabric",
+    "unity.catalog.host" = "https://onelake.table.fabric.microsoft.com/delta/<workspace-id>/<item-id>",
+    "unity.catalog.name" = "<item-id>",
+    "unity.catalog.auth.type" = "oauth-m2m",
+    "unity.catalog.client-id" = "<service-principal-application-id>",
+    "unity.catalog.client-secret" = "<service-principal-secret>",
+    "unity.catalog.oauth-token-url" = "https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token",
+    "unity.catalog.vended-credentials-enabled" = "false",
+    "azure.adls2.endpoint" = "onelake.dfs.fabric.microsoft.com",
+    "azure.adls2.oauth2_client_id" = "<service-principal-application-id>",
+    "azure.adls2.oauth2_client_secret" = "<service-principal-secret>",
+    "azure.adls2.oauth2_client_endpoint" = "https://login.microsoftonline.com/<tenant-id>/oauth2/token"
 );
 ```
 

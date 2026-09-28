@@ -62,6 +62,15 @@ public class UnityMetastoreTest {
                 "unity.catalog.aws.region", region));
     }
 
+    private static UnityCatalogProperties ossPropsWithVendedCredentials() {
+        return new UnityCatalogProperties(ImmutableMap.of(
+                "unity.catalog.host", "https://oss-uc.example.com",
+                "unity.catalog.token", "uc-token",
+                "unity.catalog.name", "main",
+                "unity.catalog.flavor", "oss",
+                "unity.catalog.vended-credentials-enabled", "true"));
+    }
+
     @Test
     public void testGetAllDatabaseNamesFiltersBlank(@Mocked UnityCatalogClient client) {
         SchemaInfo s1 = new SchemaInfo().setName("sales");
@@ -329,6 +338,25 @@ public class UnityMetastoreTest {
         CloudConfiguration cc = metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID);
         Assertions.assertEquals("us-west-2",
                 ((AwsCloudConfiguration) cc).getAwsCloudCredential().getRegion());
+    }
+
+    @Test
+    public void testResolveCloudConfigurationRequiresAwsRegionOverrideForOss(
+            @Mocked UnityCatalogClient client) {
+        new Expectations() {
+            {
+                client.getTableCredentials("main", "sales", "orders", TABLE_ID, "READ");
+                result = UnityDeltaModelFixtures.awsCredsResponse(1L);
+                client.getMetastoreSummary();
+                times = 0;
+            }
+        };
+
+        UnityMetastore metastore = new UnityMetastore(client, ossPropsWithVendedCredentials());
+        StarRocksConnectorException ex = Assertions.assertThrows(StarRocksConnectorException.class,
+                () -> metastore.resolveCloudConfiguration("sales", "orders", S3_LOCATION, TABLE_ID));
+        Assertions.assertTrue(ex.getMessage().contains("flavor 'oss'"));
+        Assertions.assertTrue(ex.getMessage().contains("unity.catalog.aws.region"));
     }
 
     @Test
