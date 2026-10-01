@@ -154,7 +154,8 @@ public class BinaryPredicateStatisticCalculator {
 
     public static Optional<Histogram> updateHistWithEqual(ColumnStatistic columnStatistic,
                                                           Optional<ConstantOperator> constant) {
-        if (constant.isEmpty() || columnStatistic.getHistogram() == null) {
+        if (constant.isEmpty() || columnStatistic.getHistogram() == null
+                 || hasOnlyNonFiniteBuckets(columnStatistic.getHistogram())) {
             return Optional.empty();
         }
 
@@ -183,7 +184,7 @@ public class BinaryPredicateStatisticCalculator {
 
             estimatedMcv.put(constantOperator.toString(), rowCountInHistogram.get());
         }
-        return Optional.of(new Histogram(new ArrayList<>(), estimatedMcv));
+        return Optional.of(new Histogram(estimatedMcv));
     }
 
     private static Statistics estimateColumnNotEqualToConstant(Optional<ColumnRefOperator> columnRefOperator,
@@ -679,7 +680,8 @@ public class BinaryPredicateStatisticCalculator {
     public static Optional<Histogram> updateHistWithLessThan(ColumnStatistic columnStatistic,
                                                              Optional<ConstantOperator> constant,
                                                              boolean containUpper) {
-        if (columnStatistic.getHistogram() == null || !constant.isPresent()) {
+        if (columnStatistic.getHistogram() == null || !constant.isPresent()
+                || hasOnlyNonFiniteBuckets(columnStatistic.getHistogram())) {
             return Optional.empty();
         }
 
@@ -740,13 +742,18 @@ public class BinaryPredicateStatisticCalculator {
             return Optional.empty();
         }
 
+        if (bucketList.isEmpty()) {
+            return Optional.of(new Histogram(estimatedMCV));
+        }
+
         return Optional.of(new Histogram(bucketList, estimatedMCV));
     }
 
     public static Optional<Histogram> updateHistWithGreaterThan(ColumnStatistic columnStatistic,
                                                                 Optional<ConstantOperator> constant,
                                                                 boolean containUpper) {
-        if (columnStatistic.getHistogram() == null || !constant.isPresent()) {
+        if (columnStatistic.getHistogram() == null || !constant.isPresent()
+                || hasOnlyNonFiniteBuckets(columnStatistic.getHistogram())) {
             return Optional.empty();
         }
 
@@ -816,6 +823,10 @@ public class BinaryPredicateStatisticCalculator {
 
         if (bucketList.isEmpty() && estimatedMCV.isEmpty()) {
             return Optional.empty();
+        }
+
+        if (bucketList.isEmpty()) {
+            return Optional.of(new Histogram(estimatedMCV));
         }
 
         return Optional.of(new Histogram(bucketList, estimatedMCV));
