@@ -963,4 +963,13 @@ public class LowCardinalityCelonisFunctionsTest extends PlanTestBase {
                 "  |  <dict id 18> : <string id 5>\n" +
                 "  |  cardinality: 1"), plan);
     }
+
+    @Test
+    public void testMatchStrings() throws Exception {
+        String plan = getFragmentPlan("SELECT CELONIS_MATCH_Strings(VARCHAR_COL, ['a', 'b'], 3, ',') FROM T");
+        Assertions.assertTrue(plan.contains(
+                "DictDecode(7: VARCHAR_COL, [celonis_match_strings(<place-holder>, ['a','b'], 3, ',')])"), plan);
+        plan = getFragmentPlan("SELECT CELONIS_MATCH_Strings('abc', ARRAY_VARCHAR_COL, 3, ',') FROM T");
+        Assertions.assertTrue(plan.contains("celonis_match_strings('abc', 4: ARRAY_VARCHAR_COL, 3, ',')"), plan);
+    }
 }
