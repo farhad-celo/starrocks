@@ -50,22 +50,23 @@ public:
         VariantAggregateState::serialize(dst);
     }
 
-    size_t deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len) override {
+    Status deserialize_and_merge(MemPool* mem_pool, SerializedStateReader& reader, size_t* memory) override {
         auto start = std::chrono::high_resolution_clock::now();
-        merging_bytes_ += len;
+        merging_bytes_ += reader.remaining();
         ++merging_states_;
-        memcpy(&edge_count_, src, sizeof(int64_t));
-        src += sizeof(int64_t);
-        len -= sizeof(int64_t);
-        skip_variant_analysis_ = (*src++ != 0);
-        len -= sizeof(uint8_t);
-        enable_proto_encoding_ = (*src++ != 0);
-        len -= sizeof(uint8_t);
-        auto rv = VariantAggregateState::deserialize_and_merge(mem_pool, src, len);
+        uint8_t skip_variant_analysis;
+        uint8_t enable_proto_encoding;
+        if (!reader.read(&edge_count_) || !reader.read(&skip_variant_analysis) ||
+            !reader.read(&enable_proto_encoding)) {
+            return Status::Corruption("truncated variant stats configuration");
+        }
+        skip_variant_analysis_ = skip_variant_analysis != 0;
+        enable_proto_encoding_ = enable_proto_encoding != 0;
+        auto status = VariantAggregateState::deserialize_and_merge(mem_pool, reader, memory);
         auto end = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
         merging_microseconds_ += duration.count();
-        return rv;
+        return status;
     }
 
     int64_t edge_count() const { return edge_count_; }

@@ -1,5 +1,7 @@
 #include "exprs/celonis/agg/variant_stats_utils.h"
 
+#include <fmt/format.h>
+
 #include "common/config.h"
 #include "modules/query/variantstats.pb.h"
 
@@ -77,25 +79,32 @@ size_t get_serialized_size(const SliceHashMap& activity_map) {
     }
     return result;
 }
-const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src, MemPool* mem_pool, SliceHashMap& activity_map,
-                                                  std::vector<std::pair<int32_t, size_t>>& index_vector,
-                                                  size_t* memory) {
+Status deserialize_activity_map_and_merge(SerializedStateReader& reader, MemPool* mem_pool, SliceHashMap& activity_map,
+                                          std::vector<std::pair<int32_t, size_t>>& index_vector, size_t* memory) {
     uint32_t num_activities;
-    memcpy(&num_activities, src, sizeof(uint32_t));
-    src += sizeof(uint32_t);
-    index_vector.resize(num_activities);
-    for (size_t i = 0; i < num_activities; ++i) {
-        uint32_t len;
-        uint32_t idx;
-        memcpy(&idx, src, sizeof(uint32_t));
-        src += sizeof(uint32_t);
-        memcpy(&len, src, sizeof(uint32_t));
-        src += sizeof(uint32_t);
-        Slice s(src, len);
-        src += len;
-        index_vector[idx] = maybe_add_activity(s, mem_pool, activity_map, memory);
+    if (!reader.read(&num_activities)) {
+        return Status::Corruption("truncated activity dictionary");
     }
-    return src;
+    // Every activity entry holds at least an idx and a size field, so a count exceeding this bound cannot be genuine.
+    if (num_activities > reader.remaining() / (2 * sizeof(uint32_t))) {
+        return Status::Corruption(
+                fmt::format("activity count {} exceeds the remaining {} bytes", num_activities, reader.remaining()));
+    }
+    // -1 marks source indices that have not been seen yet.
+    index_vector.assign(num_activities, {-1, 0});
+    for (uint32_t i = 0; i < num_activities; ++i) {
+        uint32_t idx;
+        Slice activity;
+        if (!reader.read(&idx) || !reader.read_length_prefixed<uint32_t>(&activity)) {
+            return Status::Corruption("truncated activity dictionary entry");
+        }
+        if (idx >= num_activities || index_vector[idx].first != -1) {
+            return Status::Corruption(
+                    fmt::format("invalid activity index {} in a dictionary of {} activities", idx, num_activities));
+        }
+        index_vector[idx] = maybe_add_activity(activity, mem_pool, activity_map, memory);
+    }
+    return Status::OK();
 }
 
 // Note that we've been using int32_t to index activities. So it's safe to use uint32_t for activity index.
@@ -129,32 +138,46 @@ size_t get_serialized_size(const VariantHashMap& variant_map) {
     }
     return result;
 }
-const uint8_t* deserialize_variant_map_and_merge(const uint8_t* src,
-                                                 const std::vector<std::pair<int32_t, size_t>>& index_vector,
-                                                 VariantHashMap& variant_map) {
+Status deserialize_variant_map_and_merge(SerializedStateReader& reader,
+                                         const std::vector<std::pair<int32_t, size_t>>& index_vector,
+                                         VariantHashMap& variant_map) {
     size_t num_variants;
-    memcpy(&num_variants, src, sizeof(size_t));
-    src += sizeof(size_t);
+    if (!reader.read(&num_variants)) {
+        return Status::Corruption("truncated variant map");
+    }
+    // Every variant entry holds at least a count and a num_activities field.
+    if (num_variants > reader.remaining() / (sizeof(size_t) + sizeof(uint32_t))) {
+        return Status::Corruption(
+                fmt::format("variant count {} exceeds the remaining {} bytes", num_variants, reader.remaining()));
+    }
 
     for (size_t i = 0; i < num_variants; ++i) {
         size_t count;
         uint32_t num_activities;
-        memcpy(&count, src, sizeof(size_t));
-        src += sizeof(size_t);
-        memcpy(&num_activities, src, sizeof(uint32_t));
-        src += sizeof(uint32_t);
+        if (!reader.read(&count) || !reader.read(&num_activities)) {
+            return Status::Corruption("truncated variant map entry");
+        }
+        if (num_activities > reader.remaining() / sizeof(uint32_t)) {
+            return Status::Corruption(fmt::format("variant length {} exceeds the remaining {} bytes", num_activities,
+                                                  reader.remaining()));
+        }
 
         Variant variant(num_activities);
-        for (size_t j = 0; j < num_activities; ++j) {
+        for (uint32_t j = 0; j < num_activities; ++j) {
             uint32_t idx;
-            memcpy(&idx, src, sizeof(uint32_t));
-            src += sizeof(uint32_t);
-            auto pair = index_vector[idx];
-            variant.add(pair.first, pair.second);
+            if (!reader.read(&idx)) {
+                return Status::Corruption("truncated variant");
+            }
+            if (idx >= index_vector.size()) {
+                return Status::Corruption(fmt::format("invalid activity index {} in a variant, dictionary size is {}",
+                                                      idx, index_vector.size()));
+            }
+            const auto& [local_idx, hash] = index_vector[idx];
+            variant.add(local_idx, hash);
         }
         variant_map[variant] += count;
     }
-    return src;
+    return Status::OK();
 }
 
 std::string ActivityStats::debug_string() const {

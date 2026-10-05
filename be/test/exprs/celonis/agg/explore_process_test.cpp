@@ -17,6 +17,7 @@
 #include "modules/query/variantstats.pb.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
+#include "serialized_state_test_utils.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"
 
@@ -2143,6 +2144,55 @@ TEST_F(CelonisExploreProcessTest, test_drop_low_freq_variant_avoid_empty_top_var
         }
     )json";
     match_result(e_s, rs);
+}
+
+TEST_F(CelonisExploreProcessTest, test_merge_truncated_state) {
+    const AggregateFunction* func = get_aggregate_function("celonis_explore_process", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    auto col = build_variant_column({{"a1", "a2"}, {"a2", "a3", "a3"}, {}});
+    auto weights = build_weight_column({1, 2, 3});
+    auto min_variant_count_threshold_on_leaf = ColumnHelper::create_const_column<TYPE_BIGINT>(0, col->size());
+    auto enable_proto_encoding = ColumnHelper::create_const_column<TYPE_BOOLEAN>(false, col->size());
+    std::vector<const Column*> raw_columns{col.get(), weights.get(), min_variant_count_threshold_on_leaf.get(),
+                                           enable_proto_encoding.get()};
+    ctx->set_constant_columns({nullptr, nullptr, min_variant_count_threshold_on_leaf, enable_proto_encoding});
+    auto state = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col->size(), raw_columns.data(), state->state());
+    auto serialized = BinaryColumn::create();
+    func->serialize_to_column(ctx, state->state(), serialized.get());
+    auto bytes = get_serialized_bytes(*serialized);
+
+    auto error = merge_serialized_state(func, bytes);
+    EXPECT_FALSE(error.has_value()) << error.value_or("");
+    expect_truncated_states_rejected(func, bytes);
+}
+
+TEST_F(CelonisExploreProcessTest, test_merge_malformed_state) {
+    const AggregateFunction* func = get_aggregate_function("celonis_explore_process", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    // A state with the activities "a" and "b" and the single variant <a, variant_activity>.
+    auto build_state = [](uint32_t variant_activity, size_t num_activity_stats) {
+        SerializedStateBuilder builder;
+        builder.put<uint32_t>(2).put_activity(0, "a").put_activity(1, "b");
+        builder.put<size_t>(1).put<size_t>(1).put<uint32_t>(2).put<uint32_t>(0).put<uint32_t>(variant_activity);
+        builder.put<size_t>(num_activity_stats);
+        builder.put<size_t>(1).put<size_t>(1).put<size_t>(1).put<size_t>(0).put<size_t>(0);
+        builder.put<size_t>(1).put<size_t>(1).put<size_t>(0).put<size_t>(1).put<size_t>(0);
+        // min_variant_count_threshold_on_leaf, enable_proto_encoding
+        builder.put<int64_t>(0).put<uint8_t>(0);
+        return builder.bytes();
+    };
+
+    auto error = merge_serialized_state(func, build_state(1, 2));
+    EXPECT_FALSE(error.has_value()) << error.value_or("");
+
+    expect_corrupted_state(func, build_state(2, 2), "invalid activity index 2 in a variant, dictionary size is 2");
+    expect_corrupted_state(func, build_state(1, 3), "activity stats count 3 does not match the dictionary size 2");
+    auto trailing = build_state(1, 2);
+    trailing.push_back(0);
+    expect_corrupted_state(func, trailing, "1 unexpected trailing bytes");
+    expect_corrupted_state(func, SerializedStateBuilder().put<uint32_t>(1).put_activity(1, "a").bytes(),
+                           "invalid activity index 1 in a dictionary of 1 activities");
 }
 
 } // namespace starrocks

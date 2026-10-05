@@ -10,7 +10,8 @@ public:
     void update(FunctionContext* ctx, const Column** columns, size_t row_num);
     void serialize(uint8_t* dst) const;
     size_t serialized_size() const;
-    size_t deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len);
+    // Adds the estimated memory of newly inserted activities to *memory, also when an error is returned.
+    Status deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len, size_t* memory);
     void finalize_to_column(FunctionContext* ctx, Column* to) const;
 
 private:

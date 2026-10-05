@@ -1,6 +1,8 @@
 #pragma once
 
 #include "column/column.h"
+#include "common/status.h"
+#include "exprs/celonis/serialized_state_reader.h"
 #include "rapidjson/document.h"
 #include "runtime/mem_pool.h"
 #include "variant.h"
@@ -110,18 +112,19 @@ size_t get_serialized_size(const SliceHashMap& activity_map);
  * activity, it calls `maybe_add_activity` to find the activity in the local `activity_map` or insert it if it's new.
  *
  * The function populates `index_vector` as a translation map, which maps an activity's index from the source data to
- * its corresponding index and hash in the local map.
+ * its corresponding index and hash in the local map. The source indices must be a permutation of
+ * [0, num_activities), so on success every entry of `index_vector` refers to an activity in `activity_map`.
  *
- * @param src A pointer to the buffer containing the serialized activity map.
+ * @param reader The reader positioned at the serialized activity map. Advanced past the consumed data.
  * @param mem_pool A pointer to a memory pool used for allocating storage for new activity data.
- * @param[in,out] activity_map The local activity map into which deserialized activities are merged.
+ * @param[in,out] activity_map The local activity map into which deserialized activities are merged. On error it may
+ *                             already contain some of the deserialized activities.
  * @param[out] index_vector An output vector that will be populated with a mapping from source indices to local {index, hash} pairs.
  * @param[out] memory A pointer to a memory usage counter, which is incremented when a new activity is added to the map.
- * @return A pointer to the position in the source buffer immediately after the consumed data.
+ * @return Status::Corruption if the serialized data is truncated or malformed.
  */
-const uint8_t* deserialize_activity_map_and_merge(const uint8_t* src, MemPool* mem_pool, SliceHashMap& activity_map,
-                                                  std::vector<std::pair<int32_t, size_t>>& index_vector,
-                                                  size_t* memory);
+Status deserialize_activity_map_and_merge(SerializedStateReader& reader, MemPool* mem_pool, SliceHashMap& activity_map,
+                                          std::vector<std::pair<int32_t, size_t>>& index_vector, size_t* memory);
 
 /**
  * Serializes a variant map into a byte buffer. It's a map from variants to their counts.
@@ -146,15 +149,16 @@ size_t get_serialized_size(const VariantHashMap& variant_map);
 /**
  * @brief Deserializes a variant map from a byte buffer and merges it into the local map.
  *
- * @param src A pointer to the buffer containing the serialized variant map data.
+ * @param reader The reader positioned at the serialized variant map. Advanced past the consumed data.
  * @param index_vector A vector that maps activity indices from the source data to local {index, hash} pairs. This must
  *                     be populated before calling this function.
- * @param[out] variant_map The local variant hash map into which the deserialized variants will be merged.
- * @return A pointer to the position in the source buffer immediately after the last byte read.
+ * @param[out] variant_map The local variant hash map into which the deserialized variants will be merged. On error it
+ *                         may already contain some of the deserialized variants.
+ * @return Status::Corruption if the serialized data is truncated or malformed.
  */
-const uint8_t* deserialize_variant_map_and_merge(const uint8_t* src,
-                                                 const std::vector<std::pair<int32_t, size_t>>& index_vector,
-                                                 VariantHashMap& variant_map);
+Status deserialize_variant_map_and_merge(SerializedStateReader& reader,
+                                         const std::vector<std::pair<int32_t, size_t>>& index_vector,
+                                         VariantHashMap& variant_map);
 
 // TODO(xingyuan): Move analyze_variants in variant_stats_v2 to this utils file as well
 /**

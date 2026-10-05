@@ -1,11 +1,15 @@
 #pragma once
 
+#include <fmt/format.h>
+
 #include "column/binary_column.h"
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "column/datum.h"
 #include "column/hash_set.h"
 #include "exprs/agg/aggregate.h"
+#include "exprs/celonis/agg/variant_stats_utils.h"
+#include "exprs/celonis/serialized_state_reader.h"
 #include "exprs/function_context.h"
 #include "variant.h"
 
@@ -28,7 +32,8 @@ public:
     virtual void serialize(uint8_t* dst) const;
 
     // Deserializes a VariantAggregateState object and merges it with the current state.
-    virtual size_t deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len);
+    // Adds the estimated memory of newly inserted activities to *memory, also when an error is returned.
+    virtual Status deserialize_and_merge(MemPool* mem_pool, SerializedStateReader& reader, size_t* memory);
 
     const SliceHashMap& activity_map() const { return activity_map_; }
     const VariantHashMap& variant_map() const { return variant_map_; }
@@ -81,9 +86,15 @@ public:
         DCHECK(data_column->is_binary());
         const auto* input_column = down_cast<const BinaryColumn*>(data_column);
         Slice slice = input_column->get_slice(row_num);
+        SerializedStateReader reader(reinterpret_cast<const uint8_t*>(slice.data), slice.size);
         size_t mem_usage = 0;
-        mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*)slice.data, slice.size);
+        Status status = this->data(state).deserialize_and_merge(ctx->mem_pool(), reader, &mem_usage);
         ctx->add_mem_usage(mem_usage);
+        if (UNLIKELY(!status.ok())) {
+            ctx->set_error(
+                    fmt::format("{}: corrupted intermediate state: {}", this->get_name(), status.message()).c_str(),
+                    false);
+        }
     }
 
     bool support_nullable_immediate_input() const final { return true; }

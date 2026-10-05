@@ -20,6 +20,7 @@
 #include "rapidjson/document.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
+#include "serialized_state_test_utils.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"
 
@@ -1927,6 +1928,54 @@ TEST_F(CelonisGraphTest, test_enable_proto_encoding_empty) {
     Slice slice = result->get_slice(0);
     std::string encoded_string = slice.to_string();
     EXPECT_EQ("", encoded_string);
+}
+
+TEST_F(CelonisGraphTest, test_merge_truncated_state) {
+    const AggregateFunction* func = get_aggregate_function("celonis_graph", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    auto col = build_variant_column({{"a1", "a2"}, {"a2", "a3", "a3"}, {}});
+    auto weights = build_weight_column({1, 2, 3});
+    std::vector<const Column*> raw_columns{col.get(), weights.get()};
+    auto state = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col->size(), raw_columns.data(), state->state());
+    auto serialized = BinaryColumn::create();
+    func->serialize_to_column(ctx, state->state(), serialized.get());
+    auto bytes = get_serialized_bytes(*serialized);
+
+    auto error = merge_serialized_state(func, bytes);
+    EXPECT_FALSE(error.has_value()) << error.value_or("");
+    expect_truncated_states_rejected(func, bytes);
+}
+
+TEST_F(CelonisGraphTest, test_merge_malformed_state) {
+    const AggregateFunction* func = get_aggregate_function("celonis_graph", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    // A state with the activities "a" and "b" and the single edge (edge_src, edge_dst).
+    auto build_state = [](size_t num_activity_stats, int32_t edge_src, int32_t edge_dst) {
+        SerializedStateBuilder builder;
+        builder.put<uint32_t>(2).put_activity(0, "a").put_activity(1, "b");
+        builder.put<size_t>(num_activity_stats);
+        builder.put<size_t>(1).put<size_t>(1).put<size_t>(1).put<size_t>(0);
+        builder.put<size_t>(1).put<size_t>(1).put<size_t>(0).put<size_t>(1);
+        builder.put<size_t>(1).put<int32_t>(edge_src).put<int32_t>(edge_dst).put<size_t>(1).put<size_t>(1);
+        // edge_count, enable_proto_encoding
+        builder.put<int64_t>(-1).put<uint8_t>(0);
+        return builder.bytes();
+    };
+
+    auto error = merge_serialized_state(func, build_state(2, 0, 1));
+    EXPECT_FALSE(error.has_value()) << error.value_or("");
+
+    expect_corrupted_state(func, build_state(3, 0, 1), "activity stats count 3 does not match the dictionary size 2");
+    expect_corrupted_state(func, build_state(SIZE_MAX, 0, 1),
+                           "activity stats count 18446744073709551615 does not match the dictionary size 2");
+    expect_corrupted_state(func, build_state(2, 0, 2), "invalid edge (0, 2) in a dictionary of 2 activities");
+    expect_corrupted_state(func, build_state(2, -1, 1), "invalid edge (-1, 1) in a dictionary of 2 activities");
+    auto trailing = build_state(2, 0, 1);
+    trailing.push_back(0);
+    expect_corrupted_state(func, trailing, "1 unexpected trailing bytes");
+    expect_corrupted_state(func, SerializedStateBuilder().put<uint32_t>(1).put_activity(1, "a").bytes(),
+                           "invalid activity index 1 in a dictionary of 1 activities");
 }
 
 } // namespace starrocks

@@ -31,11 +31,11 @@ public:
         VariantAggregateState::serialize(dst);
     }
 
-    size_t deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len) override {
-        memcpy(&imfd_frequency_threshold_, src, sizeof(double));
-        src += sizeof(double);
-        len -= sizeof(double);
-        return VariantAggregateState::deserialize_and_merge(mem_pool, src, len);
+    Status deserialize_and_merge(MemPool* mem_pool, SerializedStateReader& reader, size_t* memory) override {
+        if (!reader.read(&imfd_frequency_threshold_)) {
+            return Status::Corruption("truncated inductive miner configuration");
+        }
+        return VariantAggregateState::deserialize_and_merge(mem_pool, reader, memory);
     }
 
     double imfd_frequency_threshold() const { return imfd_frequency_threshold_; }

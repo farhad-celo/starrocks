@@ -8,6 +8,7 @@
 #include "exprs/celonis/agg/variant_stats.h"
 #include "runtime/mem_pool.h"
 #include "runtime/time_types.h"
+#include "serialized_state_test_utils.h"
 #include "testutil/function_utils.h"
 #include "util/slice.h"
 
@@ -380,6 +381,69 @@ TEST_F(CelonisVariantAggTest, test_large) {
         }
         std::cout << ", count: " << count << "\n";
     }
+}
+
+TEST_F(CelonisVariantAggTest, test_merge_truncated_state) {
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    auto col = build_variant_column({{"a1", "a2"}, {"a2", "a3", "a3"}, {}});
+    auto weights = build_weight_column({1, 2, 3});
+    std::vector<const Column*> raw_columns{col.get(), weights.get()};
+    auto state = ManagedAggrState::create(ctx, func);
+    func->update_batch_single_state(ctx, col->size(), raw_columns.data(), state->state());
+    auto serialized = BinaryColumn::create();
+    func->serialize_to_column(ctx, state->state(), serialized.get());
+    auto bytes = get_serialized_bytes(*serialized);
+
+    auto error = merge_serialized_state(func, bytes);
+    EXPECT_FALSE(error.has_value()) << error.value_or("");
+    // The configuration header alone (edge_count, skip_variant_analysis, enable_proto_encoding) is an empty state.
+    expect_truncated_states_rejected(func, bytes, {sizeof(int64_t) + 2 * sizeof(uint8_t)});
+}
+
+TEST_F(CelonisVariantAggTest, test_merge_malformed_state) {
+    const AggregateFunction* func = get_aggregate_function("celonis_variant_stats", TYPE_ARRAY, TYPE_VARCHAR, false);
+
+    // edge_count, skip_variant_analysis, enable_proto_encoding
+    auto header = [] { return SerializedStateBuilder().put<int64_t>(-1).put<uint8_t>(0).put<uint8_t>(0); };
+    // A dictionary with the single activity "a", followed by a variant map with a single variant of length 2.
+    auto variant_of_length_2 = [&](uint32_t idx1, uint32_t idx2) {
+        return header()
+                .put<uint32_t>(1)
+                .put_activity(0, "a")
+                .put<size_t>(1)
+                .put<size_t>(3)
+                .put<uint32_t>(2)
+                .put<uint32_t>(idx1)
+                .put<uint32_t>(idx2)
+                .bytes();
+    };
+
+    auto error = merge_serialized_state(func, variant_of_length_2(0, 0));
+    EXPECT_FALSE(error.has_value()) << error.value_or("");
+
+    expect_corrupted_state(func, variant_of_length_2(0, 1), "invalid activity index 1 in a variant");
+    expect_corrupted_state(func, variant_of_length_2(0xFFFFFFFF, 0), "invalid activity index 4294967295 in a variant");
+    expect_corrupted_state(func, header().put<uint32_t>(1).put_activity(5, "a").bytes(),
+                           "invalid activity index 5 in a dictionary of 1 activities");
+    expect_corrupted_state(func, header().put<uint32_t>(2).put_activity(0, "a").put_activity(0, "b").bytes(),
+                           "invalid activity index 0 in a dictionary of 2 activities");
+    expect_corrupted_state(func, header().put<uint32_t>(0xFFFFFFFF).put_activity(0, "a").bytes(),
+                           "activity count 4294967295 exceeds");
+    expect_corrupted_state(func, header().put<uint32_t>(1).put<uint32_t>(0).put<uint32_t>(0xFFFFFFFF).bytes(),
+                           "truncated activity dictionary entry");
+    expect_corrupted_state(func,
+                           header().put<uint32_t>(1).put_activity(0, "a").put<size_t>(SIZE_MAX).put<size_t>(1).bytes(),
+                           "variant count 18446744073709551615 exceeds");
+    expect_corrupted_state(func,
+                           header().put<uint32_t>(1)
+                                   .put_activity(0, "a")
+                                   .put<size_t>(1)
+                                   .put<size_t>(1)
+                                   .put<uint32_t>(0xFFFFFFFF)
+                                   .bytes(),
+                           "variant length 4294967295 exceeds");
+    expect_corrupted_state(func, {0, 1, 2}, "truncated variant stats configuration");
 }
 
 } // namespace starrocks

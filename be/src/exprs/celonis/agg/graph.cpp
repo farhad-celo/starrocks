@@ -1,11 +1,14 @@
 #include "graph.h"
 
+#include <fmt/format.h>
+
 #include "column/array_column.h"
 #include "column/binary_column.h"
 #include "column/column_helper.h"
 #include "column/const_column.h"
 #include "exprs/celonis/agg/util.h"
 #include "exprs/celonis/agg/variant_stats_edge_utils.h"
+#include "exprs/celonis/serialized_state_reader.h"
 #include "exprs/function_context.h"
 #include "modules/query/variantstats.pb.h"
 #include "rapidjson/document.h"
@@ -202,39 +205,41 @@ size_t CelonisGraphAggregateState::serialized_size() const {
     return result;
 }
 
-size_t CelonisGraphAggregateState::deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len) {
+Status CelonisGraphAggregateState::deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len,
+                                                         size_t* memory) {
     auto start_time = std::chrono::high_resolution_clock::now();
     merging_bytes_ += len;
     ++merging_states_;
 
     // read from src and merge with existing state.
-    size_t mem = 0;
-    const uint8_t* end = src + len;
+    SerializedStateReader reader(src, len);
 
     std::vector<std::pair<int32_t, size_t>> index_vector;
-    src = deserialize_activity_map_and_merge(src, mem_pool, activity_map_, index_vector, &mem);
+    Status status = deserialize_activity_map_and_merge(reader, mem_pool, activity_map_, index_vector, memory);
+    // Keep activity_stats_ aligned with activity_map_ even when the input turns out to be malformed.
     activity_stats_.resize(activity_map_.size());
+    RETURN_IF_ERROR(status);
 
     // read activity_stats and merge it with existing stats
     size_t num_activities;
-    memcpy(&num_activities, src, sizeof(size_t));
-    src += sizeof(size_t);
+    if (!reader.read(&num_activities)) {
+        return Status::Corruption("truncated activity stats");
+    }
+    if (num_activities != index_vector.size()) {
+        return Status::Corruption(fmt::format("activity stats count {} does not match the dictionary size {}",
+                                              num_activities, index_vector.size()));
+    }
     for (size_t i = 0; i < num_activities; ++i) {
-        int32_t local_idx = index_vector[i].first;
-        auto& stats = activity_stats_[local_idx];
         // [activity_stats] count, count_case, count_start, count_end
         size_t count = 0;
         size_t count_case = 0;
         size_t count_start = 0;
         size_t count_end = 0;
-        memcpy(&count, src, sizeof(size_t));
-        src += sizeof(size_t);
-        memcpy(&count_case, src, sizeof(size_t));
-        src += sizeof(size_t);
-        memcpy(&count_start, src, sizeof(size_t));
-        src += sizeof(size_t);
-        memcpy(&count_end, src, sizeof(size_t));
-        src += sizeof(size_t);
+        if (!reader.read(&count) || !reader.read(&count_case) || !reader.read(&count_start) ||
+            !reader.read(&count_end)) {
+            return Status::Corruption("truncated activity stats entry");
+        }
+        auto& stats = activity_stats_[index_vector[i].first];
         stats.count += count;
         stats.count_case += count_case;
         stats.count_start += count_start;
@@ -242,43 +247,43 @@ size_t CelonisGraphAggregateState::deserialize_and_merge(MemPool* mem_pool, cons
     }
 
     // read edge_stats and merge it with existing stats
+    auto is_valid_index = [&](int32_t idx) { return idx >= 0 && static_cast<size_t>(idx) < index_vector.size(); };
     size_t num_edges = 0;
-    memcpy(&num_edges, src, sizeof(size_t));
-    src += sizeof(size_t);
+    if (!reader.read(&num_edges)) {
+        return Status::Corruption("truncated edge stats");
+    }
     for (size_t i = 0; i < num_edges; ++i) {
         // [edge_stats] src1, dst1, count, count_case
         int32_t edge_src, edge_dst;
-        memcpy(&edge_src, src, sizeof(int32_t));
-        src += sizeof(int32_t);
-        memcpy(&edge_dst, src, sizeof(int32_t));
-        src += sizeof(int32_t);
-
-        int32_t local_src = index_vector[edge_src].first;
-        int32_t local_dst = index_vector[edge_dst].first;
-        Edge e(local_src, local_dst);
-        auto& stats = edge_stats_[e];
-
         size_t count = 0;
         size_t count_case = 0;
-        memcpy(&count, src, sizeof(size_t));
-        src += sizeof(size_t);
-        memcpy(&count_case, src, sizeof(size_t));
-        src += sizeof(size_t);
+        if (!reader.read(&edge_src) || !reader.read(&edge_dst) || !reader.read(&count) || !reader.read(&count_case)) {
+            return Status::Corruption("truncated edge stats entry");
+        }
+        if (!is_valid_index(edge_src) || !is_valid_index(edge_dst)) {
+            return Status::Corruption(fmt::format("invalid edge ({}, {}) in a dictionary of {} activities", edge_src,
+                                                  edge_dst, index_vector.size()));
+        }
 
+        Edge e(index_vector[edge_src].first, index_vector[edge_dst].first);
+        auto& stats = edge_stats_[e];
         stats.count += count;
         stats.count_case += count_case;
     }
 
-    memcpy(&edge_count_, src, sizeof(int64_t));
-    src += sizeof(int64_t);
-    memcpy(&enable_proto_encoding_, src, sizeof(uint8_t));
-    src += sizeof(uint8_t);
+    uint8_t enable_proto_encoding;
+    if (!reader.read(&edge_count_) || !reader.read(&enable_proto_encoding)) {
+        return Status::Corruption("truncated graph configuration");
+    }
+    enable_proto_encoding_ = enable_proto_encoding != 0;
 
-    DCHECK_EQ(src, end);
+    if (!reader.at_end()) {
+        return Status::Corruption(fmt::format("{} unexpected trailing bytes", reader.remaining()));
+    }
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
     merging_microseconds_ += duration.count();
-    return mem;
+    return Status::OK();
 }
 
 void CelonisGraphAggregateState::finalize_to_column(FunctionContext* ctx, Column* to) const {
@@ -434,8 +439,13 @@ void CelonisGraphAggregationFunction::merge(FunctionContext* ctx, const Column* 
     const auto* input_column = down_cast<const BinaryColumn*>(ColumnHelper::get_data_column(column));
     Slice slice = input_column->get_slice(row_num);
     size_t mem_usage = 0;
-    mem_usage += this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*)slice.data, slice.size);
+    Status status = this->data(state).deserialize_and_merge(ctx->mem_pool(), (const uint8_t*)slice.data, slice.size,
+                                                            &mem_usage);
     ctx->add_mem_usage(mem_usage);
+    if (UNLIKELY(!status.ok())) {
+        ctx->set_error(fmt::format("{}: corrupted intermediate state: {}", get_name(), status.message()).c_str(),
+                       false);
+    }
 }
 
 void CelonisGraphAggregationFunction::serialize_to_column(FunctionContext* ctx, ConstAggDataPtr __restrict state,

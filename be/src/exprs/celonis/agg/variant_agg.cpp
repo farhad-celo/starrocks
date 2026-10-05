@@ -68,20 +68,15 @@ void VariantAggregateState::serialize(uint8_t* dst) const {
     dst = serialize_variant_map(dst, variant_map_);
 }
 
-size_t VariantAggregateState::deserialize_and_merge(MemPool* mem_pool, const uint8_t* src, size_t len) {
-    // read from src and merge with existing state.
-    size_t mem = 0;
-    const uint8_t* end = src + len;
-
+Status VariantAggregateState::deserialize_and_merge(MemPool* mem_pool, SerializedStateReader& reader, size_t* memory) {
     // TODO(xingyuan): figure out this
-    // src can contain multiple serialized states. We merge each of them.
-    while (src < end) {
+    // The input can contain multiple serialized states. We merge each of them.
+    while (!reader.at_end()) {
         std::vector<std::pair<int32_t, size_t>> index_vector;
-        src = deserialize_activity_map_and_merge(src, mem_pool, activity_map_, index_vector, &mem);
-        src = deserialize_variant_map_and_merge(src, index_vector, variant_map_);
+        RETURN_IF_ERROR(deserialize_activity_map_and_merge(reader, mem_pool, activity_map_, index_vector, memory));
+        RETURN_IF_ERROR(deserialize_variant_map_and_merge(reader, index_vector, variant_map_));
     }
-    DCHECK_EQ(src, end);
-    return mem;
+    return Status::OK();
 }
 
 std::string VariantAggregateState::debug_string() const {
