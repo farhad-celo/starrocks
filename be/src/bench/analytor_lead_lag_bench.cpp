@@ -49,16 +49,15 @@
 #include "column/column_helper.h"
 #include "column/nullable_column.h"
 #include "column/vectorized_fwd.h"
-#include "common/config_exec_flow_fwd.h"
-#include "common/config_exec_fwd.h"
-#include "common/runtime_profile.h"
-#include "common/system/cpu_info.h"
+#include "common/config.h"
 #include "exec/analytor.h"
 #include "runtime/descriptor_helper.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem_pool.h"
 #include "runtime/runtime_state.h"
 #include "types/logical_type.h"
+#include "util/cpu_info.h"
+#include "util/runtime_profile.h"
 
 namespace starrocks {
 
@@ -148,7 +147,8 @@ static void BM_LeadLagIgnoreNulls(benchmark::State& bstate, Fn fn, Pattern patte
         TPlanNode tnode = make_lead_lag_plan_node(fn, in_tuple_id, col_slot_id, 1);
         RuntimeProfile profile("Analytor");
 
-        auto analytor = std::make_shared<Analytor>(tnode, result_tuple, false);
+        RowDescriptor input_row_desc(*desc_tbl, std::vector<TTupleId>{in_tuple_id});
+        auto analytor = std::make_shared<Analytor>(tnode, input_row_desc, result_tuple, false);
         CHECK(analytor->prepare(state, &pool, &profile).ok());
         CHECK(analytor->open(state).ok());
 
