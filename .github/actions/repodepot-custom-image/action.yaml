@@ -152,7 +152,7 @@ runs:
         rel="${{ inputs.relative-source-location }}"
         rel="${rel:-.}"
 
-        gh workflow run "$WORKFLOW_FILE" \
+        "$GITHUB_ACTION_PATH/dispatch-and-wait.sh" "$WORKFLOW_FILE" \
           --repo "$GH_REPO" \
           --ref "${WORKFLOW_REF}" \
           -f component-name="${{ inputs.component-name }}" \
@@ -164,17 +164,6 @@ runs:
           -f image-name="${{ inputs.image-name }}" \
           -f image-tag="${{ inputs.image-tag }}" \
           -f celostar-docker-tag="${CELOSTAR_DOCKER_TAG}"
-
-        sleep 5
-
-        RUN_ID=$(gh run list --repo "$GH_REPO" --workflow "$WORKFLOW_FILE" --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId')
-
-        if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
-          echo "::error::Could not find the triggered Run ID. Check if $WORKFLOW_FILE exists on ${WORKFLOW_REF}."
-          exit 1
-        fi
-
-        gh run watch "$RUN_ID" --repo "$GH_REPO" -i 300 --exit-status
 
     - name: Dispatch fe-native-build (celostar-fe)
       id: dispatch-fe-native-build
@@ -191,7 +180,7 @@ runs:
         rel="${{ inputs.relative-source-location }}"
         rel="${rel:-.}"
 
-        gh workflow run "$WORKFLOW_FILE" \
+        "$GITHUB_ACTION_PATH/dispatch-and-wait.sh" "$WORKFLOW_FILE" \
           --repo "$GH_REPO" \
           --ref "${WORKFLOW_REF}" \
           -f component-name="${{ inputs.component-name }}" \
@@ -203,14 +192,3 @@ runs:
           -f image-name="${{ inputs.image-name }}" \
           -f image-tag="${{ inputs.image-tag }}" \
           -f celostar-docker-tag="${CELOSTAR_DOCKER_TAG}"
-
-        sleep 5
-
-        RUN_ID=$(gh run list --repo "$GH_REPO" --workflow "$WORKFLOW_FILE" --branch "${WORKFLOW_REF}" --limit 1 --json databaseId --jq '.[0].databaseId')
-
-        if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
-          echo "::error::Could not find the triggered Run ID. Check if $WORKFLOW_FILE exists on ${WORKFLOW_REF}."
-          exit 1
-        fi
-
-        gh run watch "$RUN_ID" --repo "$GH_REPO" -i 300 --exit-status
