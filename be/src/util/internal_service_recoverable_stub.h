@@ -26,6 +26,26 @@ namespace starrocks {
 class PInternalService_RecoverableStub : public PInternalService,
                                          public std::enable_shared_from_this<PInternalService_RecoverableStub> {
 public:
+    class RpcInFlightGuard {
+    public:
+        RpcInFlightGuard() = default;
+        ~RpcInFlightGuard();
+        RpcInFlightGuard(RpcInFlightGuard&& other) noexcept;
+        RpcInFlightGuard& operator=(RpcInFlightGuard&& other) noexcept;
+        RpcInFlightGuard(const RpcInFlightGuard&) = delete;
+        RpcInFlightGuard& operator=(const RpcInFlightGuard&) = delete;
+        PInternalService_RecoverableStub* stub() const { return _stub.get(); }
+        int64_t in_flight_before() const { return _in_flight_before; }
+        void reset();
+
+    private:
+        friend class PInternalService_RecoverableStub;
+        explicit RpcInFlightGuard(std::shared_ptr<PInternalService_RecoverableStub> stub, int64_t payload_bytes);
+        std::shared_ptr<PInternalService_RecoverableStub> _stub;
+        int64_t _in_flight_before{0};
+        int64_t _payload_bytes{0};
+    };
+
     PInternalService_RecoverableStub(const butil::EndPoint& endpoint, std::string protocol = "",
                                      int64_t connection_group_seed = 0);
     ~PInternalService_RecoverableStub();
@@ -38,6 +58,14 @@ public:
     }
 
     int64_t connection_group() const { return _connection_group.load(); }
+    int64_t num_in_flight_rpcs() const { return _num_in_flight_rpcs.load(); }
+    int64_t num_in_flight_payload_bytes() const { return _in_flight_payload_bytes.load(); }
+    const butil::EndPoint& endpoint() const { return _endpoint; }
+    RpcInFlightGuard reserve_rpc(int64_t payload_bytes = 0) { return RpcInFlightGuard(shared_from_this(), payload_bytes); }
+    using PInternalService::transmit_chunk;
+    void transmit_chunk(RpcInFlightGuard reservation, ::google::protobuf::RpcController* controller,
+                        const ::starrocks::PTransmitChunkParams* request, ::starrocks::PTransmitChunkResult* response,
+                        ::google::protobuf::Closure* done);
 
     // implements PInternalService ------------------------------------------
 
@@ -100,6 +128,8 @@ private:
     std::atomic<int64_t> _connection_group = 0;
     // Distinguishes stubs that share the same endpoint.
     const int64_t _connection_group_seed = 0;
+    std::atomic<int64_t> _num_in_flight_rpcs{0};
+    std::atomic<int64_t> _in_flight_payload_bytes{0};
     mutable std::shared_mutex _mutex;
     std::string _protocol;
 

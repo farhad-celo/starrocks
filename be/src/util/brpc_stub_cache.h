@@ -70,10 +70,17 @@ public:
         }
         const int64_t now_us = butil::gettimeofday_us();
         if (now_us >= _deadline) {
-            LOG(INFO) << "cleanup brpc stub, endpoint:" << _endpoint << ", idle for " << (now_us - _deadline) / 1000
-                      << "ms past deadline";
-            _cache->_stub_map.erase(_endpoint);
-            return;
+            // Only evict once no caller outside the cache still references the entry. Hot-path callers (e.g. an
+            // exchange sink) cache the StubPool for their whole query; evicting an in-use pool would split load
+            // accounting across a freshly created one. While it is still referenced, extend the window and
+            // reschedule instead of evicting.
+            if (!_cache->is_cached_entry_in_use_locked(_endpoint)) {
+                LOG(INFO) << "cleanup brpc stub, endpoint:" << _endpoint << ", idle for " << (now_us - _deadline) / 1000
+                          << "ms past deadline";
+                _cache->_stub_map.erase(_endpoint);
+                return;
+            }
+            _deadline = now_us + _ttl_seconds * 1000 * 1000;
         }
 
         auto new_task = std::make_shared<EndpointCleanupTask<StubCacheT>>(_cache, _endpoint, _ttl_seconds);
@@ -102,12 +109,40 @@ private:
 
 class BrpcStubCache {
 public:
+    struct StubSelection {
+        PInternalService_RecoverableStub::RpcInFlightGuard reservation;
+        bool created_on_contention = false;
+        bool selected_at_connection_limit = false;
+    };
+
+    // StubPool stores the connections for one endpoint.
+    struct StubPool {
+        StubPool();
+        ~StubPool();
+        std::shared_ptr<PInternalService_RecoverableStub> get_or_create(const butil::EndPoint& endpoint);
+        StatusOr<StubSelection> acquire_least_loaded(const butil::EndPoint& endpoint, int64_t payload_bytes);
+
+        std::shared_ptr<PInternalService_RecoverableStub> _create_stub_locked(const butil::EndPoint& endpoint);
+
+        std::mutex _mutex;
+        std::vector<std::shared_ptr<PInternalService_RecoverableStub>> _stubs;
+        // Round-robin cursor for get_or_create(). Kept separate from the least-loaded cursor below so that
+        // least-loaded selection (used by exchange sinks) does not perturb the even distribution that
+        // get_or_create()'s callers rely on when brpc_max_connections_per_server > 1.
+        int64_t _last_selected_idx = -1;
+        // Rotation cursor for acquire_least_loaded(), used to break ties between equally-idle stubs.
+        int64_t _last_least_loaded_idx = -1;
+        std::shared_ptr<EndpointCleanupTask<BrpcStubCache>> _cleanup_task;
+    };
+
     BrpcStubCache(ExecEnv* exec_env);
     ~BrpcStubCache();
 
     std::shared_ptr<PInternalService_RecoverableStub> get_stub(const butil::EndPoint& endpoint);
     std::shared_ptr<PInternalService_RecoverableStub> get_stub(const TNetworkAddress& taddr);
     std::shared_ptr<PInternalService_RecoverableStub> get_stub(const std::string& host, int port);
+    StatusOr<StubSelection> acquire_least_loaded_stub(const butil::EndPoint& endpoint, int64_t payload_bytes = 0);
+    std::shared_ptr<StubPool> get_or_create_pool(const butil::EndPoint& endpoint);
 
 private:
     friend class EndpointCleanupTask<BrpcStubCache>;
@@ -118,21 +153,16 @@ private:
         return pool != nullptr && (*pool)->_cleanup_task.get() == task;
     }
 
+    // True while a caller outside the cache still holds the pooled StubPool (the map itself holds one reference).
+    // Hot-path callers cache the pool for their query lifetime; the cleanup task keeps such pools in the map so
+    // concurrent callers keep sharing them, and only evicts after the last external reference is dropped.
+    bool is_cached_entry_in_use_locked(const butil::EndPoint& endpoint) const {
+        auto pool = _stub_map.seek(endpoint);
+        return pool != nullptr && pool->use_count() > 1;
+    }
+
     bool replace_cleanup_task_locked(const butil::EndPoint& endpoint,
                                      std::shared_ptr<EndpointCleanupTask<BrpcStubCache>> task);
-
-    // StubPool is used to store all stubs with a single endpoint, and the client in the same BE process maintains up to
-    // brpc_max_connections_per_server single connections with each server.
-    // These connections will be created during the first few accesses and will be reused later.
-    struct StubPool {
-        StubPool();
-        ~StubPool();
-        std::shared_ptr<PInternalService_RecoverableStub> get_or_create(const butil::EndPoint& endpoint);
-
-        std::vector<std::shared_ptr<PInternalService_RecoverableStub>> _stubs;
-        int64_t _idx = -1;
-        std::shared_ptr<EndpointCleanupTask<BrpcStubCache>> _cleanup_task;
-    };
 
     SpinLock _lock;
     butil::FlatMap<butil::EndPoint, std::shared_ptr<StubPool>> _stub_map;
@@ -159,6 +189,9 @@ private:
         auto entry = _stub_map.seek(endpoint);
         return entry != nullptr && entry->cleanup_task.get() == task;
     }
+
+    // HTTP stub entries are never cached outside the map, so they follow pure idle-TTL eviction.
+    bool is_cached_entry_in_use_locked(const butil::EndPoint&) const { return false; }
 
     bool replace_cleanup_task_locked(const butil::EndPoint& endpoint,
                                      std::shared_ptr<EndpointCleanupTask<HttpBrpcStubCache>> task);
