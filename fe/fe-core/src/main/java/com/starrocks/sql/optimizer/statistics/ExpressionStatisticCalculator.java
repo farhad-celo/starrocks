@@ -18,7 +18,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.starrocks.analysis.BinaryType;
 import com.starrocks.analysis.LargeIntLiteral;
+import com.starrocks.catalog.ArrayType;
 import com.starrocks.catalog.FunctionSet;
+import com.starrocks.catalog.MapType;
+import com.starrocks.catalog.StructField;
+import com.starrocks.catalog.StructType;
 import com.starrocks.catalog.Type;
 import com.starrocks.sql.common.ErrorType;
 import com.starrocks.sql.common.StarRocksPlannerException;
@@ -38,6 +42,7 @@ import com.starrocks.sql.optimizer.operator.scalar.MatchExprOperator;
 import com.starrocks.sql.optimizer.operator.scalar.PredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperatorVisitor;
+import com.starrocks.sql.optimizer.operator.scalar.SubfieldOperator;
 import com.starrocks.sql.optimizer.rewrite.ScalarOperatorFunctions;
 import com.starrocks.sql.spm.SPMFunctions;
 import org.apache.logging.log4j.LogManager;
@@ -448,6 +453,71 @@ public class ExpressionStatisticCalculator {
             }
 
             return builder.build();
+        }
+
+        /**
+         * STRUCT_COLUMN.f1. ... .fn extracts a (nested) field of a struct. A struct has no per-field statistics, so
+         * they are derived from the statistics of the struct as following:
+         * - average row size: the share of the field in the average row size of the struct, weighted by the
+         * estimated width of the field type relative to its sibling fields, at every level of the path.
+         * - collection size: the collection size of the struct if the field is a collection, e.g. for a struct of
+         * arrays that are all aggregated over the same rows.
+         * - nulls fraction: the nulls fraction of the struct, as the field of a null struct is null.
+         * - distinct values: the distinct values of the struct, as a field cannot have more distinct values than the
+         * struct holding it.
+         * - min / max: unknown, as the min / max of a struct do not carry over to its fields.
+         */
+        @Override
+        public ColumnStatistic visitSubfield(SubfieldOperator subfield, Void context) {
+            ColumnStatistic childStatistic = subfield.getChild(0).accept(this, context);
+            if (childStatistic.isUnknown()) {
+                return ColumnStatistic.unknown();
+            }
+
+            double fieldShare = 1;
+            Type type = subfield.getChild(0).getType();
+            for (String fieldName : subfield.getFieldNames()) {
+                if (!type.isStructType()) {
+                    return ColumnStatistic.unknown();
+                }
+                StructField field = ((StructType) type).getField(fieldName);
+                if (field == null) {
+                    return ColumnStatistic.unknown();
+                }
+                fieldShare *= estimateTypeWidth(field.getType()) / estimateTypeWidth(type);
+                type = field.getType();
+            }
+
+            double collectionSize = type.isCollectionType() ? childStatistic.getCollectionSize() :
+                    ColumnStatistic.DEFAULT_COLLECTION_SIZE;
+            return ColumnStatistic.builder()
+                    .setMinValue(Double.NEGATIVE_INFINITY)
+                    .setMaxValue(Double.POSITIVE_INFINITY)
+                    .setNullsFraction(childStatistic.getNullsFraction())
+                    .setAverageRowSize(childStatistic.getAverageRowSize() * fieldShare)
+                    .setDistinctValuesCount(childStatistic.getDistinctValuesCount())
+                    .setCollectionSize(collectionSize)
+                    .build();
+        }
+
+        /**
+         * Estimates the relative width of a value of the given type, only to split the size of a struct across its
+         * fields. Collections are weighted by their item types, as their collection size is not known per field.
+         */
+        private static double estimateTypeWidth(Type type) {
+            if (type.isStructType()) {
+                double width = 0;
+                for (StructField field : ((StructType) type).getFields()) {
+                    width += estimateTypeWidth(field.getType());
+                }
+                return Math.max(1, width);
+            } else if (type.isArrayType()) {
+                return estimateTypeWidth(((ArrayType) type).getItemType());
+            } else if (type.isMapType()) {
+                MapType mapType = (MapType) type;
+                return estimateTypeWidth(mapType.getKeyType()) + estimateTypeWidth(mapType.getValueType());
+            }
+            return type.isScalarType() ? Math.max(1, type.getTypeSize()) : 1;
         }
 
         @Override

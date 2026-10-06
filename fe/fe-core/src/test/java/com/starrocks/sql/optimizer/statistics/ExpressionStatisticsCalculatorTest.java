@@ -18,7 +18,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.starrocks.analysis.BinaryType;
 import com.starrocks.analysis.LargeIntLiteral;
+import com.starrocks.catalog.ArrayType;
 import com.starrocks.catalog.FunctionSet;
+import com.starrocks.catalog.StructField;
+import com.starrocks.catalog.StructType;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.util.DateUtils;
 import com.starrocks.qe.ConnectContext;
@@ -42,6 +45,7 @@ import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.InPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.IsNullPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.LambdaFunctionOperator;
+import com.starrocks.sql.optimizer.operator.scalar.SubfieldOperator;
 import com.starrocks.sql.optimizer.rewrite.ScalarOperatorFunctions;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -3554,5 +3558,92 @@ public class ExpressionStatisticsCalculatorTest {
         final var actualStatistic = ExpressionStatisticCalculator.calculate(ifOp, statistics);
 
         Assertions.assertEquals(expectedTotalRows, actualStatistic.getHistogram().getTotalRows());
+    }
+
+    private static ColumnStatistic subfieldStatistic(Type structType, ColumnStatistic structStatistic,
+                                                     List<String> fieldNames, Type fieldType) {
+        ColumnRefOperator structColumn = new ColumnRefOperator(0, structType, "struct_column", true);
+        Statistics statistics = Statistics.builder()
+                .setOutputRowCount(1000)
+                .addColumnStatistic(structColumn, structStatistic)
+                .build();
+        return ExpressionStatisticCalculator.calculate(new SubfieldOperator(structColumn, fieldType, fieldNames),
+                statistics);
+    }
+
+    private static ColumnStatistic structStatistic(double averageRowSize, double collectionSize) {
+        return ColumnStatistic.builder()
+                .setMinValue(Double.NEGATIVE_INFINITY)
+                .setMaxValue(Double.POSITIVE_INFINITY)
+                .setNullsFraction(0.1)
+                .setAverageRowSize(averageRowSize)
+                .setDistinctValuesCount(50)
+                .setCollectionSize(collectionSize)
+                .build();
+    }
+
+    @Test
+    public void testSubfieldSplitsAverageRowSizeByFieldWidth() {
+        // STRUCT<a INT, b VARCHAR>, estimated widths 4 and 16.
+        StructType structType = new StructType(List.of(
+                new StructField("a", Type.INT), new StructField("b", Type.VARCHAR)), true);
+        ColumnStatistic structStatistic = structStatistic(40, ColumnStatistic.DEFAULT_COLLECTION_SIZE);
+
+        ColumnStatistic intField = subfieldStatistic(structType, structStatistic, List.of("a"), Type.INT);
+        ColumnStatistic stringField = subfieldStatistic(structType, structStatistic, List.of("b"), Type.VARCHAR);
+
+        Assertions.assertEquals(8, intField.getAverageRowSize(), 0.001);
+        Assertions.assertEquals(32, stringField.getAverageRowSize(), 0.001);
+        Assertions.assertEquals(0.1, intField.getNullsFraction(), 0.001);
+        Assertions.assertEquals(50, intField.getDistinctValuesCount(), 0.001);
+        Assertions.assertEquals(Double.NEGATIVE_INFINITY, intField.getMinValue(), 0.001);
+        Assertions.assertEquals(Double.POSITIVE_INFINITY, intField.getMaxValue(), 0.001);
+        Assertions.assertEquals(ColumnStatistic.DEFAULT_COLLECTION_SIZE, intField.getCollectionSize(), 0.001);
+    }
+
+    @Test
+    public void testSubfieldOfNestedStruct() {
+        // STRUCT<a INT, s STRUCT<x BIGINT, y INT>>: s.x has a width of 8 out of 16.
+        StructType structType = new StructType(List.of(
+                new StructField("a", Type.INT),
+                new StructField("s", new StructType(List.of(
+                        new StructField("x", Type.BIGINT), new StructField("y", Type.INT)), true))), true);
+        ColumnStatistic structStatistic = structStatistic(32, ColumnStatistic.DEFAULT_COLLECTION_SIZE);
+
+        ColumnStatistic nestedField = subfieldStatistic(structType, structStatistic, List.of("s", "x"), Type.BIGINT);
+
+        // The share is applied at every level of the path: 12 / 16 * 8 / 12.
+        Assertions.assertEquals(16, nestedField.getAverageRowSize(), 0.001);
+        Assertions.assertEquals(50, nestedField.getDistinctValuesCount(), 0.001);
+    }
+
+    @Test
+    public void testSubfieldOfStructOfArraysInheritsCollectionSize() {
+        // STRUCT<a ARRAY<INT>, b ARRAY<VARCHAR>> holding 10 items per array.
+        Type intArrayType = new ArrayType(Type.INT);
+        Type stringArrayType = new ArrayType(Type.VARCHAR);
+        StructType structType = new StructType(List.of(
+                new StructField("a", intArrayType), new StructField("b", stringArrayType)), true);
+        ColumnStatistic structStatistic = structStatistic(200, 10);
+
+        ColumnStatistic intArrayField = subfieldStatistic(structType, structStatistic, List.of("a"), intArrayType);
+        ColumnStatistic stringArrayField =
+                subfieldStatistic(structType, structStatistic, List.of("b"), stringArrayType);
+
+        // Arrays are weighted by their item types and keep the collection size of the struct.
+        Assertions.assertEquals(40, intArrayField.getAverageRowSize(), 0.001);
+        Assertions.assertEquals(160, stringArrayField.getAverageRowSize(), 0.001);
+        Assertions.assertEquals(10, intArrayField.getCollectionSize(), 0.001);
+        Assertions.assertEquals(10, stringArrayField.getCollectionSize(), 0.001);
+    }
+
+    @Test
+    public void testSubfieldOfStructWithUnknownStatistics() {
+        StructType structType = new StructType(List.of(
+                new StructField("a", Type.INT), new StructField("b", Type.VARCHAR)), true);
+
+        ColumnStatistic field = subfieldStatistic(structType, ColumnStatistic.unknown(), List.of("a"), Type.INT);
+
+        Assertions.assertTrue(field.isUnknown());
     }
 }
