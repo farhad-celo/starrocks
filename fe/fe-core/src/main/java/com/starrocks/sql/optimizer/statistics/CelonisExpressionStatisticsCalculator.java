@@ -17,6 +17,7 @@ package com.starrocks.sql.optimizer.statistics;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.starrocks.analysis.LargeIntLiteral;
+import com.starrocks.catalog.AggregateFunction;
 import com.starrocks.catalog.ArrayType;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.ScalarType;
@@ -42,6 +43,10 @@ public class CelonisExpressionStatisticsCalculator {
 
     public static ColumnStatistic callCalculate(CallOperator call, List<ColumnStatistic> childrenColumnStatistics,
                                                 Statistics inputStatistics, double rowCount) {
+        if (FunctionSet.MULTI_ARRAY_AGG.equalsIgnoreCase(call.getFnName())) {
+            return multiArrayAggCalculate(call, childrenColumnStatistics, inputStatistics, rowCount);
+        }
+
         if (call.getChildren().size() == 1) {
             return unaryExpressionCalculate(call, childrenColumnStatistics.get(0), rowCount);
         } else if (call.getChildren().size() == 2) {
@@ -247,6 +252,69 @@ public class CelonisExpressionStatisticsCalculator {
                 .setAverageRowSize(averageRowSize)
                 .setDistinctValuesCount(distinctValues)
                 .build();
+    }
+
+    private static ColumnStatistic multiArrayAggCalculate(CallOperator callOperator,
+                                                          List<ColumnStatistic> childrenColumnStatistics,
+                                                          Statistics inputStatistics, double rowCount) {
+        if (callOperator.getChildren().isEmpty() || !(callOperator.getFunction() instanceof AggregateFunction)) {
+            return null;
+        }
+        final var aggregateFunction = (AggregateFunction) callOperator.getFunction();
+        final double groupSize = Math.max(1, inputStatistics.getOutputRowCount() / Math.max(1, rowCount));
+
+        final double collectionSize;
+        final double itemsAverageRowSize;
+        final var firstChild = callOperator.getChild(0);
+        final var partialStatistic = childrenColumnStatistics.get(0);
+        final boolean hasIntermediateType = firstChild.isColumnRef() &&
+                aggregateFunction.getIntermediateType() != null &&
+                firstChild.getType().equals(aggregateFunction.getIntermediateType());
+        final boolean hasPartialStatistic = !partialStatistic.isUnknown() && partialStatistic.getCollectionSize() > 0;
+        if (hasIntermediateType && !hasPartialStatistic && !matchesArgumentTypes(callOperator, aggregateFunction)) {
+            return null;
+        }
+        if (hasIntermediateType && hasPartialStatistic) {
+            collectionSize = partialStatistic.getCollectionSize() * groupSize;
+            itemsAverageRowSize = partialStatistic.getAverageRowSize() / partialStatistic.getCollectionSize();
+        } else {
+            final int numOrderByColumns =
+                    aggregateFunction.getIsAscOrder() == null ? 0 : aggregateFunction.getIsAscOrder().size();
+            final int numValueColumns = callOperator.getChildren().size() - numOrderByColumns;
+            if (numValueColumns <= 0) {
+                return null;
+            }
+            double averageRowSize = 0;
+            for (int i = 0; i < numValueColumns; ++i) {
+                final var childStatistic = childrenColumnStatistics.get(i);
+                averageRowSize += childStatistic.isUnknown() ? callOperator.getChild(i).getType().getTypeSize() :
+                        childStatistic.getAverageRowSize();
+            }
+            collectionSize = groupSize;
+            itemsAverageRowSize = averageRowSize;
+        }
+
+        return ColumnStatistic.builder()
+                .setMinValue(NEGATIVE_INFINITY)
+                .setMaxValue(POSITIVE_INFINITY)
+                .setNullsFraction(0)
+                .setAverageRowSize(collectionSize * itemsAverageRowSize)
+                .setDistinctValuesCount(Math.max(1, rowCount))
+                .setCollectionSize(collectionSize)
+                .build();
+    }
+
+    private static boolean matchesArgumentTypes(CallOperator callOperator, AggregateFunction aggregateFunction) {
+        final Type[] argumentTypes = aggregateFunction.getArgs();
+        if (argumentTypes == null || argumentTypes.length != callOperator.getChildren().size()) {
+            return false;
+        }
+        for (int i = 0; i < argumentTypes.length; ++i) {
+            if (!callOperator.getChild(i).getType().equals(argumentTypes[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // Deduplicates the mappings to preserve only the last occurrence of each mapped value, because if a value is mapped

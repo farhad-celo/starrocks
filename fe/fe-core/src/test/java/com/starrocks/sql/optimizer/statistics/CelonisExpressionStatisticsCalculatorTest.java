@@ -16,8 +16,10 @@ package com.starrocks.sql.optimizer.statistics;
 
 import com.google.common.collect.Lists;
 import com.starrocks.analysis.LargeIntLiteral;
+import com.starrocks.catalog.AggregateFunction;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.ScalarType;
+import com.starrocks.catalog.StructType;
 import com.starrocks.catalog.Type;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.operator.scalar.ArrayOperator;
@@ -34,6 +36,7 @@ import com.starrocks.utframe.UtFrameUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -1915,5 +1918,158 @@ public class CelonisExpressionStatisticsCalculatorTest {
 
         // THEN nothing is projected, as we do not know which values the second argument takes.
         assertNull(columnStatistic.getHistogram());
+    }
+
+    private static final ColumnRefOperator MULTI_ARRAY_AGG_INT_COLUMN =
+            new ColumnRefOperator(10, Type.INT, "int_value", true);
+    private static final ColumnRefOperator MULTI_ARRAY_AGG_STRING_COLUMN =
+            new ColumnRefOperator(11, Type.VARCHAR, "string_value", true);
+    private static final ColumnRefOperator MULTI_ARRAY_AGG_ORDER_COLUMN =
+            new ColumnRefOperator(12, Type.BIGINT, "order_value", true);
+    private static final ColumnRefOperator MULTI_ARRAY_AGG_PARTIAL_COLUMN =
+            new ColumnRefOperator(13, Type.VARBINARY, "partial", true);
+    private static final Type MULTI_ARRAY_AGG_RETURN_TYPE =
+            new StructType(List.of(Type.ARRAY_INT, Type.ARRAY_VARCHAR));
+
+    private static CallOperator multiArrayAgg(List<ScalarOperator> children, int numOrderByColumns) {
+        return multiArrayAgg(children, children.stream().map(ScalarOperator::getType).toList(), numOrderByColumns);
+    }
+
+    private static CallOperator multiArrayAgg(List<ScalarOperator> children, List<Type> argumentTypes,
+                                              int numOrderByColumns) {
+        final var function = AggregateFunction.createBuiltin(FunctionSet.MULTI_ARRAY_AGG,
+                argumentTypes, MULTI_ARRAY_AGG_RETURN_TYPE, Type.VARBINARY, true,
+                false, false, false);
+        function.setIsAscOrder(Collections.nCopies(numOrderByColumns, true));
+        return new CallOperator(FunctionSet.MULTI_ARRAY_AGG, MULTI_ARRAY_AGG_RETURN_TYPE, children, function);
+    }
+
+    private static Statistics multiArrayAggInputStatistics(ColumnStatistic intColumnStatistic) {
+        return Statistics.builder()
+                .setOutputRowCount(1000)
+                .addColumnStatistic(MULTI_ARRAY_AGG_INT_COLUMN, intColumnStatistic)
+                .addColumnStatistic(MULTI_ARRAY_AGG_STRING_COLUMN, ColumnStatistic.builder()
+                        .setMinValue(NEGATIVE_INFINITY)
+                        .setMaxValue(POSITIVE_INFINITY)
+                        .setDistinctValuesCount(50)
+                        .setNullsFraction(0.1)
+                        .setAverageRowSize(20)
+                        .build())
+                .addColumnStatistic(MULTI_ARRAY_AGG_ORDER_COLUMN, ColumnStatistic.builder()
+                        .setMinValue(0)
+                        .setMaxValue(1000)
+                        .setDistinctValuesCount(1000)
+                        .setNullsFraction(0)
+                        .setAverageRowSize(8)
+                        .build())
+                .build();
+    }
+
+    private static ColumnStatistic multiArrayAggIntColumnStatistic() {
+        return ColumnStatistic.builder()
+                .setMinValue(0)
+                .setMaxValue(100)
+                .setDistinctValuesCount(80)
+                .setNullsFraction(0.2)
+                .setAverageRowSize(4)
+                .build();
+    }
+
+    @Test
+    public void testMultiArrayAggUpdatePhase() {
+        final var callOperator = multiArrayAgg(List.of(MULTI_ARRAY_AGG_INT_COLUMN, MULTI_ARRAY_AGG_STRING_COLUMN), 0);
+
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator,
+                multiArrayAggInputStatistics(multiArrayAggIntColumnStatistic()), 100);
+
+        assertEquals(NEGATIVE_INFINITY, columnStatistic.getMinValue(), 0.001);
+        assertEquals(POSITIVE_INFINITY, columnStatistic.getMaxValue(), 0.001);
+        assertEquals(0, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(100, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(10, columnStatistic.getCollectionSize(), 0.001);
+        assertEquals(240, columnStatistic.getAverageRowSize(), 0.001);
+    }
+
+    @Test
+    public void testMultiArrayAggUpdatePhaseIgnoresOrderByColumns() {
+        final var callOperator = multiArrayAgg(List.of(MULTI_ARRAY_AGG_INT_COLUMN, MULTI_ARRAY_AGG_STRING_COLUMN,
+                MULTI_ARRAY_AGG_ORDER_COLUMN), 1);
+
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator,
+                multiArrayAggInputStatistics(multiArrayAggIntColumnStatistic()), 100);
+
+        assertEquals(10, columnStatistic.getCollectionSize(), 0.001);
+        assertEquals(240, columnStatistic.getAverageRowSize(), 0.001);
+    }
+
+    @Test
+    public void testMultiArrayAggUpdatePhaseWithUnknownChildStatistics() {
+        final var callOperator = multiArrayAgg(List.of(MULTI_ARRAY_AGG_INT_COLUMN, MULTI_ARRAY_AGG_STRING_COLUMN), 0);
+
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator,
+                multiArrayAggInputStatistics(ColumnStatistic.unknown()), 100);
+
+        assertEquals(10, columnStatistic.getCollectionSize(), 0.001);
+        assertEquals(10 * (Type.INT.getTypeSize() + 20), columnStatistic.getAverageRowSize(), 0.001);
+    }
+
+
+    @Test
+    public void testMultiArrayAggUpdatePhaseWithIntermediateTypeValueColumn() {
+        final var callOperator = multiArrayAgg(List.of(MULTI_ARRAY_AGG_PARTIAL_COLUMN), 0);
+        final var statistics = Statistics.builder()
+                .setOutputRowCount(1000)
+                .addColumnStatistic(MULTI_ARRAY_AGG_PARTIAL_COLUMN, ColumnStatistic.builder()
+                        .setMinValue(NEGATIVE_INFINITY)
+                        .setMaxValue(POSITIVE_INFINITY)
+                        .setDistinctValuesCount(500)
+                        .setNullsFraction(0)
+                        .setAverageRowSize(30)
+                        .build())
+                .build();
+
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics, 100);
+
+        assertEquals(10, columnStatistic.getCollectionSize(), 0.001);
+        assertEquals(300, columnStatistic.getAverageRowSize(), 0.001);
+    }
+
+
+    @Test
+    public void testMultiArrayAggMergePhase() {
+        final var callOperator = multiArrayAgg(List.of(MULTI_ARRAY_AGG_PARTIAL_COLUMN),
+                List.of(Type.INT, Type.VARCHAR, Type.BIGINT), 1);
+        final var statistics = Statistics.builder()
+                .setOutputRowCount(100)
+                .addColumnStatistic(MULTI_ARRAY_AGG_PARTIAL_COLUMN, ColumnStatistic.builder()
+                        .setMinValue(NEGATIVE_INFINITY)
+                        .setMaxValue(POSITIVE_INFINITY)
+                        .setDistinctValuesCount(100)
+                        .setNullsFraction(0)
+                        .setAverageRowSize(240)
+                        .setCollectionSize(10)
+                        .build())
+                .build();
+
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics, 50);
+
+        assertEquals(0, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(50, columnStatistic.getDistinctValuesCount(), 0.001);
+        assertEquals(20, columnStatistic.getCollectionSize(), 0.001);
+        assertEquals(480, columnStatistic.getAverageRowSize(), 0.001);
+    }
+
+    @Test
+    public void testMultiArrayAggMergePhaseWithUnknownPartialStatistics() {
+        final var callOperator = multiArrayAgg(List.of(MULTI_ARRAY_AGG_PARTIAL_COLUMN),
+                List.of(Type.INT, Type.VARCHAR), 0);
+        final var statistics = Statistics.builder()
+                .setOutputRowCount(100)
+                .addColumnStatistic(MULTI_ARRAY_AGG_PARTIAL_COLUMN, ColumnStatistic.unknown())
+                .build();
+
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics, 50);
+
+        assertThat(columnStatistic.isUnknown()).isTrue();
     }
 }
