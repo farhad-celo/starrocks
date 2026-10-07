@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "column/column_helper.h"
+#include "exprs/array_functions.h"
 #include "exprs/celonis/anyval_util.h"
 #include "exprs/function_context.h"
 #include "util.h"
@@ -99,6 +100,82 @@ TEST_F(CelonisIndexActivityTest, index_activity_order_empty_input) {
     evaluator_.add_expected(kNullDatum);
 
     run_test(TYPE_ARRAY_INT, "INDEX_ACTIVITY_ORDER", "FORWARD", array);
+}
+
+TEST_F(CelonisIndexActivityTest, constant_empty_array_sortby) {
+    constexpr size_t num_rows = 31;
+    for (const auto* mode : {"INDEX_ACTIVITY_ORDER", "INDEX_ACTIVITY_LOOP", "INDEX_ACTIVITY_TYPE"}) {
+        for (const auto* direction : {"FORWARD", "REVERSE"}) {
+            SCOPED_TRACE(std::string(mode) + " " + direction);
+            auto data = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+            data->append_datum(DatumArray{});
+            auto input = ConstColumn::create(std::move(data), num_rows);
+
+            auto result = run(TYPE_ARRAY_VARCHAR, mode, direction, input);
+            ASSERT_TRUE(result.ok()) << result.status().message();
+            ASSERT_EQ(num_rows, result.value()->size());
+            ASSERT_TRUE(result.value()->is_constant());
+
+            auto values = ColumnHelper::create_column(TYPE_ARRAY_BIGINT, false);
+            celonis::TestEvaluator<TYPE_BIGINT> evaluator;
+            for (size_t row = 0; row < num_rows; ++row) {
+                values->append_datum(DatumArray{});
+                evaluator.add_expected(DatumArray{});
+            }
+            evaluator.evaluate(result.value());
+            auto sorted = ArrayFunctions::array_sortby<TYPE_BIGINT>(nullptr, {values, result.value()});
+            ASSERT_TRUE(sorted.ok()) << sorted.status().message();
+            evaluator.evaluate(sorted.value());
+        }
+    }
+}
+
+TEST_F(CelonisIndexActivityTest, constant_array_with_null_elements) {
+    constexpr size_t num_rows = 3;
+    struct TestCase {
+        const char* mode;
+        const char* direction;
+        DatumArray expected;
+    };
+    const TestCase cases[] = {
+            {"INDEX_ACTIVITY_ORDER", "FORWARD", {1L, kNullDatum, 2L, 3L, 4L}},
+            {"INDEX_ACTIVITY_ORDER", "REVERSE", {4L, kNullDatum, 3L, 2L, 1L}},
+            {"INDEX_ACTIVITY_LOOP", "FORWARD", {1L, kNullDatum, 2L, 1L, 1L}},
+            {"INDEX_ACTIVITY_LOOP", "REVERSE", {2L, kNullDatum, 1L, 1L, 1L}},
+            {"INDEX_ACTIVITY_TYPE", "FORWARD", {1L, kNullDatum, 2L, 1L, 3L}},
+            {"INDEX_ACTIVITY_TYPE", "REVERSE", {3L, kNullDatum, 2L, 1L, 1L}},
+    };
+    for (const auto& test : cases) {
+        SCOPED_TRACE(std::string(test.mode) + " " + test.direction);
+        auto data = ColumnHelper::create_column(TYPE_ARRAY_VARCHAR, false);
+        data->append_datum(DatumArray{"A", kNullDatum, "A", "B", "A"});
+        auto input = ConstColumn::create(std::move(data), num_rows);
+
+        auto result = run(TYPE_ARRAY_VARCHAR, test.mode, test.direction, input);
+        ASSERT_TRUE(result.ok()) << result.status().message();
+        ASSERT_TRUE(result.value()->is_constant());
+        celonis::TestEvaluator<TYPE_BIGINT> evaluator;
+        for (size_t row = 0; row < num_rows; ++row) {
+            evaluator.add_expected(test.expected);
+        }
+        evaluator.evaluate(result.value());
+    }
+}
+
+TEST_F(CelonisIndexActivityTest, constant_null_array) {
+    constexpr size_t num_rows = 3;
+    for (const auto* mode : {"INDEX_ACTIVITY_ORDER", "INDEX_ACTIVITY_LOOP", "INDEX_ACTIVITY_TYPE"}) {
+        for (const auto* direction : {"FORWARD", "REVERSE"}) {
+            SCOPED_TRACE(std::string(mode) + " " + direction);
+            auto input = ColumnHelper::create_const_null_column(num_rows);
+            auto result = run(TYPE_ARRAY_VARCHAR, mode, direction, input);
+            ASSERT_TRUE(result.ok()) << result.status().message();
+            ASSERT_EQ(num_rows, result.value()->size());
+            for (size_t row = 0; row < num_rows; ++row) {
+                EXPECT_TRUE(result.value()->get(row).is_null());
+            }
+        }
+    }
 }
 
 TEST_F(CelonisIndexActivityTest, index_activity_order_nulls) {

@@ -304,13 +304,18 @@ Status CelonisIndexActivity::celonis_index_activity_close(starrocks::FunctionCon
 
 StatusOr<ColumnPtr> CelonisIndexActivity::celonis_index_activity(FunctionContext* context, const Columns& columns) {
     RETURN_IF_COLUMNS_ONLY_NULL(columns);
-    const Column* array_column = columns[0].get();
+    const Column* array_column = FunctionHelper::get_data_column_of_const(columns[0]).get();
     const auto* state = reinterpret_cast<const CelonisIndexActivityStateFragmentLocal*>(
             context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
 
     auto result = state->function(array_column);
     if (array_column->has_null()) {
-        return NullableColumn::create(std::move(result), down_cast<const NullableColumn*>(array_column)->null_column());
+        result = NullableColumn::create(std::move(result),
+                                        down_cast<const NullableColumn*>(array_column)->null_column());
+    }
+    if (columns[0]->is_constant()) {
+        // The implementation evaluates the stored array once; preserve the input's logical row count.
+        return ConstColumn::create(std::move(result), columns[0]->size());
     }
     return result;
 }
