@@ -38,7 +38,7 @@ env:
   RELEASE_VERSION: fe-test
   GITHUB_USERNAME: ${{ github.actor }}
   GITHUB_TOKEN: ${{ github.token }}
-  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
+  BUILDER: ghcr.io/celonis/celostar/starrocks-dev-env:pr2847-3.5-cc-26aa883
   BUILD_PARALLELISM: 16
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch
     runs-on: [runs-on, runner=1cpu-linux-arm64, "run-id=${{ github.run_id }}"]
     outputs:
-      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
+      builder_image: ghcr.io/celonis/celostar/starrocks-dev-env:pr2847-3.5-cc-26aa883
     steps:
       - run: echo "builder_image=${{ env.BUILDER }}" >> $GITHUB_OUTPUT
 

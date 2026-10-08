@@ -1,4 +1,4 @@
-FROM ghcr.io/celonis/celostar/starrocks-dev-env:3.5-cc-86b916f9
+FROM ghcr.io/celonis/celostar/starrocks-dev-env:pr2847-3.5-cc-26aa883
 
 # Setup homcc
 RUN wget https://github.com/celonis/homcc/releases/download/v1.0.4/python3-homcc-common_1.0.4_all.deb
