@@ -38,10 +38,11 @@ void trim_if(std::string& value, const phmap::flat_hash_set<char, StdHash<char>>
 template <typename TrimFn>
 requires std::invocable<TrimFn, std::string&, int32_t>
 [[nodiscard]] ColumnPtr trim_for_each(
-        const ColumnPtr& input_column, TrimFn&& trim_fn,
+        const Columns& columns, TrimFn&& trim_fn,
         const std::optional<ColumnViewer<TYPE_VARCHAR>>& characters_column = std::nullopt) {
-    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(input_column.get());
-    const auto input_column_viewer{ColumnViewer<TYPE_VARCHAR>(input_column)};
+    // Size the result from both arguments: a constant input with non-constant characters still needs a row each.
+    auto [all_const, num_rows] = ColumnHelper::num_packed_rows(columns);
+    const auto input_column_viewer{ColumnViewer<TYPE_VARCHAR>(columns[0])};
     ColumnBuilder<TYPE_VARCHAR> result_column(num_rows);
 
     for (auto row{0}; row < num_rows; ++row) {
@@ -63,7 +64,7 @@ template <TrimDirection TRIM_DIRECTION>
     phmap::flat_hash_set<char, StdHash<char>> unique_characters{};
 
     return trim_for_each(
-            columns[0],
+            columns,
             [&unique_characters, &characters_column_viewer](std::string& value, const auto row) {
                 const auto characters{characters_column_viewer.value(row).to_string()};
                 unique_characters.insert(characters.begin(), characters.end());
@@ -82,7 +83,7 @@ template <TrimDirection TRIM_DIRECTION>
         return ColumnHelper::create_const_null_column(columns[0]->size());
     }
 
-    return trim_for_each(columns[0], [&characters](std::string& value, auto /* row */) {
+    return trim_for_each(columns, [&characters](std::string& value, auto /* row */) {
         trim_if<TRIM_DIRECTION>(value, characters.value());
     });
 }

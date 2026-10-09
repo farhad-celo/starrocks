@@ -248,6 +248,28 @@ TEST_F(CelonisTrimTest, ltrim_all_null_constants) {
     ASSERT_TRUE(result->only_null());
 }
 
+TEST_F(CelonisTrimTest, ltrim_constant_input_with_string_column) {
+    ColumnPtr characters = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
+    characters->append_datum("x");
+    characters->append_nulls(1);
+    characters->append_datum(" ");
+    characters->append_datum(" a");
+
+    ColumnPtr input_column = ColumnHelper::create_const_column<TYPE_VARCHAR>(" abc", characters->size());
+
+    auto result_status = RunLtrimNonConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
+
+    ASSERT_FALSE(result->is_constant());
+    ASSERT_EQ(result->size(), 4);
+    ASSERT_EQ(result_view.value(0).to_string(), " abc");
+    ASSERT_TRUE(result->get(1).is_null());
+    ASSERT_EQ(result_view.value(2).to_string(), "abc");
+    ASSERT_EQ(result_view.value(3).to_string(), "bc");
+}
+
 TEST_F(CelonisTrimTest, rtrim_whitespace_trim_arg) {
     ColumnPtr input_column = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
     input_column->append_datum("Example without trailing whitespace");
@@ -406,6 +428,28 @@ TEST_F(CelonisTrimTest, rtrim_with_string_column) {
     ASSERT_EQ(result_view.value(3).to_string(), "4");
     ASSERT_EQ(result_view.value(4).to_string(), "5_");
     ASSERT_TRUE(result->get(5).is_null());
+}
+
+TEST_F(CelonisTrimTest, rtrim_constant_input_with_string_column) {
+    ColumnPtr characters = ColumnHelper::create_column(TypeDescriptor::from_logical_type(TYPE_VARCHAR), true);
+    characters->append_datum("x");
+    characters->append_nulls(1);
+    characters->append_datum(" ");
+    characters->append_datum("c ");
+
+    ColumnPtr input_column = ColumnHelper::create_const_column<TYPE_VARCHAR>("abc ", characters->size());
+
+    auto result_status = RunRtrimNonConstantCase(input_column, characters);
+    ASSERT_TRUE(result_status.ok());
+    const auto result = result_status.value();
+    const auto result_view = ColumnViewer<TYPE_VARCHAR>(result);
+
+    ASSERT_FALSE(result->is_constant());
+    ASSERT_EQ(result->size(), 4);
+    ASSERT_EQ(result_view.value(0).to_string(), "abc ");
+    ASSERT_TRUE(result->get(1).is_null());
+    ASSERT_EQ(result_view.value(2).to_string(), "abc");
+    ASSERT_EQ(result_view.value(3).to_string(), "ab");
 }
 
 TEST_F(CelonisTrimTest, rtrim_all_null_constants) {
