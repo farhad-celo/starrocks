@@ -1218,7 +1218,7 @@ public class CelonisExpressionStatisticsCalculatorTest {
         assertThat(columnStatistic.getHistogram().getMCV()).containsExactlyInAnyOrderEntriesOf(Map.of(
                         "manuell", 300L, //
                         "maschinell", 200L + 30L, //
-                        "other", 262L) // rest of row count inferred from MCVs
+                        "other", 370L) // rest of row count inferred from MCVs
         );
     }
 
@@ -1279,6 +1279,47 @@ public class CelonisExpressionStatisticsCalculatorTest {
         assertEquals(baselineStats.getNullsFraction(), identityDefaultStats.getNullsFraction(), 0.001);
         assertEquals(baselineStats.getDistinctValuesCount(), identityDefaultStats.getDistinctValuesCount(), 0.001);
         assertEquals(baselineStats.getAverageRowSize(), identityDefaultStats.getAverageRowSize(), 0.001);
+    }
+
+    @Test
+    public void testCelonisRemapValuesHoldsNonMcvRowsInBucketSpanningOutputRange() {
+        // GIVEN an INT column over 10000 rows, 20% NULL, whose MCVs 100 and 200 cover 4000 rows.
+        final var col = new ColumnRefOperator(0, Type.INT, "c", true);
+        final var statistics = Statistics.builder()
+                .addColumnStatistic(col,
+                        ColumnStatistic.builder() //
+                                .setMinValue(100) //
+                                .setMaxValue(1000) //
+                                .setNullsFraction(0.2) //
+                                .setDistinctValuesCount(100) //
+                                .setHistogram(new Histogram(List.of(), Map.of("100", 3000L, "200", 1000L))) //
+                                .build()) //
+                .setOutputRowCount(10000) //
+                .build();
+
+        final var remapValuesCall = new CallOperator(FunctionSet.CELONIS_REMAP_VALUES, Type.INT,
+                Lists.newArrayList(
+                        col,
+                        new ArrayOperator(Type.INT, true, Lists.newArrayList(
+                                ConstantOperator.createInt(100), ConstantOperator.createInt(200))),
+                        new ArrayOperator(Type.INT, true, Lists.newArrayList(
+                                ConstantOperator.createInt(10), ConstantOperator.createInt(1010)))
+                ));
+
+        // WHEN
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(remapValuesCall, statistics);
+
+        // THEN the MCVs follow their mapping, and the other 4000 non-NULL rows (80% * 10000 - 4000) are held by a single
+        // bucket spanning the output range [10, 1010].
+        final var histogram = columnStatistic.getHistogram();
+        assertNotNull(histogram);
+        assertThat(histogram.getMCV()).containsExactlyInAnyOrderEntriesOf(Map.of("10", 3000L, "1010", 1000L));
+        assertThat(histogram.getBuckets()).singleElement().satisfies(bucket -> {
+            assertEquals(10, bucket.getLower(), 0.001);
+            assertEquals(1010, bucket.getUpper(), 0.001);
+            assertThat(bucket.getCount()).isEqualTo(4000L);
+            assertThat(bucket.getUpperRepeats()).isEqualTo(0L);
+        });
     }
 
     private static class NullSkewTestScenario {

@@ -576,7 +576,7 @@ public class CelonisExpressionStatisticsCalculator {
 
         nullsFraction = Math.min(1.0, nullsFraction);
         final var histogram = projectHistogramThroughRemapValues(inputColumnStatistic, deduplicatedValuesMap, defaultValue,
-                nullsFraction);
+                nullsFraction, minValue, maxValue, rowCount);
 
         return ColumnStatistic.builder()
                 .setMinValue(minValue == POSITIVE_INFINITY ? NEGATIVE_INFINITY : minValue) // Avoid unset min
@@ -591,13 +591,20 @@ public class CelonisExpressionStatisticsCalculator {
     private static Histogram projectHistogramThroughRemapValues(ColumnStatistic inputColumnStatistic,
                                                                 Map<ConstantOperator, ConstantOperator> valuesMap,
                                                                 ConstantOperator defaultValue,
-                                                                double outputNullsFraction) {
+                                                                double outputNullsFraction,
+                                                                double outputMinValue,
+                                                                double outputMaxValue,
+                                                                double rowCount) {
         final var inputHistogram = inputColumnStatistic.getHistogram();
         if (inputHistogram == null || inputHistogram.getMCV() == null) {
             return null;
         }
 
         final var inputMcvs = inputHistogram.getMCV();
+        final double outputNonNullRows = rowCount * (1 - outputNullsFraction);
+        // Shrink stale MCV magnitudes (recorded against inputHistogram's own total) to the live rowCount; never inflate.
+        final double rowCountScaleFactor = Math.min(1.0, outputNonNullRows / inputHistogram.getTotalRows());
+
         final var projectedMcvs = new HashMap<String, Long>();
 
         for (final var mappedPair : valuesMap.entrySet()) {
@@ -614,7 +621,8 @@ public class CelonisExpressionStatisticsCalculator {
                 // Histograms do not carry NULL as an MCV key, so estimate this part from null fraction.
                 final var keyOpt = toMcvKey(mappedTo);
                 keyOpt.ifPresent(key -> projectedMcvs.merge(key,
-                        (long) (inputHistogram.getTotalRows() * inputColumnStatistic.getNullsFraction()), Long::sum));
+                        (long) (inputHistogram.getTotalRows() * inputColumnStatistic.getNullsFraction() * rowCountScaleFactor),
+                        Long::sum));
                 continue;
             }
 
@@ -624,7 +632,8 @@ public class CelonisExpressionStatisticsCalculator {
                 final var mappedFromRowCount = inputMcvs.get(mappedFromKey);
                 if (mappedFromRowCount != null && mappedFromRowCount > 0) {
                     final var mappedToKeyOpt = toMcvKey(mappedTo);
-                    mappedToKeyOpt.ifPresent(mappedToKey -> projectedMcvs.merge(mappedToKey, mappedFromRowCount, Long::sum));
+                    mappedToKeyOpt.ifPresent(mappedToKey -> projectedMcvs.merge(mappedToKey,
+                            (long) (mappedFromRowCount * rowCountScaleFactor), Long::sum));
                 }
             });
 
@@ -632,15 +641,8 @@ public class CelonisExpressionStatisticsCalculator {
 
         // Map everything else (inferred by non-null rows + existing mapped MCVs) to the default value.
         if (defaultValue != null && !defaultValue.isNull()) {
-            final long unmappedMcvRows = inputMcvs.keySet().stream() //
-                    .filter(mcvKey -> !projectedMcvs.containsKey(mcvKey)) //
-                    .mapToLong(inputMcvs::get) //
-                    .sum(); //
-            final long nonNullRows = (long) (inputHistogram.getTotalRows() * (1.0 - outputNullsFraction));
             final long knownFromMcvRows = projectedMcvs.values().stream().mapToLong(Long::longValue).sum();
-            final long unmappedNonMcvRows = nonNullRows - knownFromMcvRows;
-
-            final var defaultRows = unmappedMcvRows + unmappedNonMcvRows;
+            final var defaultRows = Math.round(outputNonNullRows) - knownFromMcvRows;
 
             if (defaultRows > 0) {
                 final var keyOpt = toMcvKey(defaultValue);
@@ -651,7 +653,8 @@ public class CelonisExpressionStatisticsCalculator {
         if (projectedMcvs.isEmpty()) {
             return null;
         }
-        return new Histogram(List.of(), projectedMcvs);
+
+        return Histogram.ofSingleBucket(outputMinValue, outputMaxValue, outputNonNullRows, projectedMcvs);
     }
 
     private static Optional<String> toMcvKey(ConstantOperator operator) {

@@ -16,7 +16,6 @@ package com.starrocks.sql.optimizer.statistics;
 
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Streams;
-import com.starrocks.analysis.LargeIntLiteral;
 import com.starrocks.metric.celonis.CelonisMetrics;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
@@ -135,7 +134,7 @@ public class CelonisHashMcvProjector {
         }
 
         CelonisMetrics.increaseCounter("celonis_hash_mcv_propagation", "Amount of propagated Celonis hash MCVs");
-        return new Histogram(List.of(), projectedMcvs);
+        return Histogram.ofSingleBucket(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, rowCount, projectedMcvs);
     }
 
     /**
@@ -213,17 +212,9 @@ public class CelonisHashMcvProjector {
             return null;
         }
 
-        // Keep one full-range bucket for the rows not covered by projected MCVs.
-        final var mcvRowCount = projectedMcvs.values().stream().mapToLong(Long::longValue).sum();
-        final var nonMcvRowCount = Math.max(0L, Math.round(rowCount) - mcvRowCount);
-        final var buckets = nonMcvRowCount > 0 //
-                ? List.of(new Bucket(LargeIntLiteral.LARGE_INT_MIN.doubleValue(),
-                        LargeIntLiteral.LARGE_INT_MAX.doubleValue(), nonMcvRowCount, 0L)) //
-                : List.<Bucket>of();
-
         CelonisMetrics.increaseCounter("celonis_hash_mcv_propagation_multi_arg",
                 "Amount of Celonis multi-argument hash calls whose MCVs were propagated");
-        return new Histogram(buckets, projectedMcvs);
+        return Histogram.ofSingleBucket(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, rowCount, projectedMcvs);
     }
 
     /**

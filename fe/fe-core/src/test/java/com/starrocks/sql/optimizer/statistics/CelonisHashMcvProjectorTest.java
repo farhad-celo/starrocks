@@ -14,7 +14,6 @@
 
 package com.starrocks.sql.optimizer.statistics;
 
-import com.starrocks.analysis.LargeIntLiteral;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.Type;
 import com.starrocks.qe.ConnectContext;
@@ -327,9 +326,8 @@ public class CelonisHashMcvProjectorTest {
         assertThat(histogram.getBuckets()).singleElement().satisfies(bucket -> {
             assertThat(bucket.getCount()).isEqualTo(9895);
             assertThat(bucket.getUpperRepeats()).isEqualTo(0);
-            // The bucket spans the range of the hash, which is the whole LARGEINT range.
-            assertThat(bucket.getLower()).isEqualTo(LargeIntLiteral.LARGE_INT_MIN.doubleValue());
-            assertThat(bucket.getUpper()).isEqualTo(LargeIntLiteral.LARGE_INT_MAX.doubleValue());
+            assertThat(bucket.getLower()).isEqualTo(Double.POSITIVE_INFINITY);
+            assertThat(bucket.getUpper()).isEqualTo(Double.POSITIVE_INFINITY);
         });
         assertThat(histogram.getTotalRows()).isEqualTo(10000);
     }
