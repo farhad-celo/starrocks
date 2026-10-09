@@ -164,7 +164,7 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
             FunctionSet.CELONIS_STRING_SPLIT, FunctionSet.CELONIS_REMAP_VALUES, FunctionSet.CELONIS_IN_LIKE_V2,
             FunctionSet.CELONIS_IN, FunctionSet.CELONIS_STRING_TO_INT, FunctionSet.CELONIS_LTRIM,
             FunctionSet.CELONIS_PATINDEX, FunctionSet.CELONIS_IN_JSON, FunctionSet.CELONIS_STRINGHASH,
-            FunctionSet.CELONIS_MATCH_STRINGS);
+            FunctionSet.CELONIS_MATCH_STRINGS, FunctionSet.CELONIS_RTRIM);
 
     static {
         if (Config.celonis_enable_scalar_functions_dictification) {
