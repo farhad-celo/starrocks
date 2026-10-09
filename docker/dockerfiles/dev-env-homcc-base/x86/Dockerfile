@@ -18,7 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lldb \
     ninja-build \
     clang-format \
-    htop
+    clangd-15 \
+    htop \
+    && ln -sf /usr/bin/clangd-15 /usr/bin/clangd
 
 # Set up ccache
 ENV CCACHE_PREFIX=homcc

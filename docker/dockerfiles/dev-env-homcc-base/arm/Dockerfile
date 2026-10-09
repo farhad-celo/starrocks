@@ -13,5 +13,8 @@ RUN apt-get update && apt-get install -y pip mysql-client
 # Some more convenient dev tooling
 RUN apt install -y lldb ninja-build clang-format htop
 
+# clangd language server (C++20) for editor/LSP use.
+RUN apt install -y clangd-15 && ln -sf /usr/bin/clangd-15 /usr/bin/clangd
+
 # Set up ccache
 ENV CCACHE_PREFIX=homcc
