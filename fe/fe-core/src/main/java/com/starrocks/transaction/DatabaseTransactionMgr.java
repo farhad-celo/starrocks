@@ -77,6 +77,7 @@ import com.starrocks.replication.ReplicationTxnCommitAttachment;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.server.RunMode;
 import com.starrocks.sql.analyzer.FeNameFormat;
+import com.starrocks.task.PublishVersionTask;
 import com.starrocks.thrift.TUniqueId;
 import com.starrocks.warehouse.cngroup.ComputeResource;
 import io.opentelemetry.api.trace.Span;
@@ -1284,6 +1285,7 @@ public class DatabaseTransactionMgr {
                 // Fold in the stats the BEs reported through their publish tasks before snapshotting,
                 // so the finishing thread is the only writer of the commit infos (see issue #77595).
                 transactionState.applyPublishTaskTabletStats();
+                collectPublishedIndexRowCounts(transactionState, db, errorReplicaIds);
                 copiedState = new TransactionState(transactionState);
                 boolean hasError = false;
                 Set<Long> droppedTableIds = Sets.newHashSet();
@@ -2189,6 +2191,73 @@ public class DatabaseTransactionMgr {
         }
     }
 
+    /**
+     * Record in each partition commit info the row count of every loaded index at the commit version, from the
+     * counts the BEs proved on publish. They are persisted with the visible transaction, so every FE sets its
+     * index row counts as the version becomes visible instead of waiting for its next TabletStatMgr round.
+     * <p>
+     * Must be called on the finishing thread, under the table write lock and the transaction write lock, before
+     * the state is copied for the edit log; the reported counts are first set on the replicas there, see
+     * PublishVersionTask#applyPublishedTabletRowCounts.
+     */
+    private void collectPublishedIndexRowCounts(TransactionState transactionState, Database db,
+                                                @Nullable Set<Long> errorReplicaIds) {
+        for (PublishVersionTask task : transactionState.getPublishVersionTasks().values()) {
+            if (task.isFinished()) {
+                task.applyPublishedTabletRowCounts();
+            }
+        }
+        for (TableCommitInfo tableCommitInfo : transactionState.getIdToTableCommitInfos().values()) {
+            Table table = globalStateMgr.getLocalMetastore().getTable(db.getId(), tableCommitInfo.getTableId());
+            if (!(table instanceof OlapTable) || table.isCloudNativeTableOrMaterializedView()) {
+                continue;
+            }
+            OlapTable olapTable = (OlapTable) table;
+            for (PartitionCommitInfo partitionCommitInfo : tableCommitInfo.getIdToPartitionCommitInfo().values()) {
+                PhysicalPartition physicalPartition =
+                        olapTable.getPhysicalPartition(partitionCommitInfo.getPhysicalPartitionId());
+                if (physicalPartition == null) {
+                    continue;
+                }
+                Map<Long, Long> indexRowCounts = Maps.newHashMap();
+                for (MaterializedIndex index : transactionState.getPartitionLoadedIndexesWithoutLock(
+                        olapTable.getId(), physicalPartition)) {
+                    publishedIndexRowCount(index, partitionCommitInfo.getVersion(), errorReplicaIds)
+                            .ifPresent(rowCount -> indexRowCounts.put(index.getId(), rowCount));
+                }
+                partitionCommitInfo.setIndexIdToRowCount(indexRowCounts.isEmpty() ? null : indexRowCounts);
+            }
+        }
+    }
+
+    /**
+     * Sum, over the tablets of the index, of a row count proven at exactly {@code version} by a replica that is
+     * neither an error replica nor bad, nor has a failed version. Empty if some tablet has no such replica: then
+     * the index count is left to the next TabletStatMgr round, as before.
+     */
+    static OptionalLong publishedIndexRowCount(MaterializedIndex index, long version,
+                                               @Nullable Set<Long> errorReplicaIds) {
+        long indexRowCount = 0L;
+        for (Tablet tablet : index.getTablets()) {
+            if (!(tablet instanceof LocalTablet)) {
+                return OptionalLong.empty();
+            }
+            long tabletRowCount = -1L;
+            for (Replica replica : ((LocalTablet) tablet).getImmutableReplicas()) {
+                if ((errorReplicaIds != null && errorReplicaIds.contains(replica.getId())) || replica.isBad() ||
+                        replica.getLastFailedVersion() >= 0) {
+                    continue;
+                }
+                tabletRowCount = Math.max(tabletRowCount, replica.getRowCountAtVersion(version));
+            }
+            if (tabletRowCount < 0) {
+                return OptionalLong.empty();
+            }
+            indexRowCount += tabletRowCount;
+        }
+        return OptionalLong.of(indexRowCount);
+    }
+
     private boolean updateCatalogAfterVisible(TransactionState transactionState, Database db) {
         for (TableCommitInfo tableCommitInfo : transactionState.getIdToTableCommitInfos().values()) {
             Table table = globalStateMgr.getLocalMetastore().getTable(db.getId(), tableCommitInfo.getTableId());
@@ -2430,6 +2499,7 @@ public class DatabaseTransactionMgr {
                 // See the sibling call in finishTransaction(): merge the publish tasks' reported stats
                 // here, under the txn write lock, so nothing mutates the commit infos while we copy.
                 transactionState.applyPublishTaskTabletStats();
+                collectPublishedIndexRowCounts(transactionState, db, publishErrorReplicas);
                 copiedState = new TransactionState(transactionState);
 
                 finishSpan.addEvent("txnmgr_lock");

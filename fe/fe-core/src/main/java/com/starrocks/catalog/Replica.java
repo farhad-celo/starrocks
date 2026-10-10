@@ -402,6 +402,21 @@ public class Replica implements Writable {
         this.statsVersion = statsVersion;
     }
 
+    /**
+     * Record the row count the BE reported for exactly {@code version} when it published that version.
+     * Like a stat collection, it is written together with the version proving it, so
+     * {@link #getRowCountAtVersion} answers for that version until the next stat or publish. A count for an
+     * older version than the one already proven is ignored.
+     */
+    public synchronized void updateRowCountAtVersion(long rowNum, long version) {
+        if (version < statsVersion) {
+            // e.g. a retried finish re-applying an older publish's count over a newer stat
+            return;
+        }
+        this.rowCount = rowNum;
+        this.statsVersion = version;
+    }
+
     public synchronized void updateRowCount(long newVersion, long minReadableVersion, long newDataSize,
                                             long newRowCount) {
         updateReplicaInfo(newVersion, this.lastFailedVersion,

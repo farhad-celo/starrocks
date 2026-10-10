@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
 import java.util.Collections;
 
 public class PublishVersionTaskTest {
@@ -58,5 +59,35 @@ public class PublishVersionTaskTest {
 
         Assertions.assertEquals(baseVersion + 3, replica.getMinReadableVersion());
         Assertions.assertEquals(baseVersion + 5, replica.getVersion());
+    }
+
+    @Test
+    public void testPublishedRowCountsSkipDroppedTablets() {
+        long backendId = GlobalStateMgrTestUtil.testBackendId1;
+        long tabletId = GlobalStateMgrTestUtil.testTabletId1;
+        long version = GlobalStateMgrTestUtil.testStartVersion + 1;
+        Replica replica = GlobalStateMgr.getCurrentState().getTabletInvertedIndex().getReplica(tabletId, backendId);
+        PublishVersionTask task = new PublishVersionTask(backendId, 1L, 1L, GlobalStateMgrTestUtil.testDbId1, 0L,
+                Collections.emptyList(), null, null, 0L, null, false, TransactionType.TXN_NORMAL);
+
+        // a tablet dropped since the publish comes first, an unknown-count pair last: the existing tablet must
+        // still get its own count, not a neighbour's
+        TTabletVersionPair dropped = new TTabletVersionPair();
+        dropped.setTablet_id(999_999L);
+        dropped.setVersion(version);
+        dropped.setRow_count(5L);
+        TTabletVersionPair existing = new TTabletVersionPair();
+        existing.setTablet_id(tabletId);
+        existing.setVersion(version);
+        existing.setRow_count(700L);
+        TTabletVersionPair withoutCount = new TTabletVersionPair();
+        withoutCount.setTablet_id(tabletId + 1);
+        withoutCount.setVersion(version);
+        task.collectPublishedTabletRowCounts(Arrays.asList(dropped, existing, withoutCount));
+        task.applyPublishedTabletRowCounts();
+
+        Assertions.assertEquals(700L, replica.getRowCountAtVersion(version));
+        // the replica version itself is left to the publish mechanism
+        Assertions.assertEquals(GlobalStateMgrTestUtil.testStartVersion, replica.getVersion());
     }
 }

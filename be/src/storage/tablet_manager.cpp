@@ -1432,7 +1432,10 @@ void TabletManager::_build_tablet_stat() {
                 stat.__set_row_num(tablet->num_rows());
             }
             stat.__set_version_count(tablet->version_count());
-            if (tablet->max_continuous_version() == version_before) {
+            // Primary-key tablets report their rowsets' rows here, which include replaced and deleted rows,
+            // while the publish response reports their live rows (see run_publish_version_task). Don't vouch
+            // for this count with a version, so that only one definition of a primary-key count is ever proven.
+            if (tablet->updates() == nullptr && tablet->max_continuous_version() == version_before) {
                 stat.__set_version(version_before);
             }
             _tablet_stat_cache.emplace(tablet->tablet_id(), stat);

@@ -1260,4 +1260,25 @@ public class TabletStatMgrTest {
 
         Assertions.assertEquals(baseTabletCount + rollupTabletCount, tablets.size());
     }
+
+    @Test
+    public void testProvenRowCountIgnoresStaleReplicas() {
+        long version = 11L;
+        LocalTablet tablet = new LocalTablet(101L);
+        Replica fresh = new Replica(1L, 1L, version, 0, 0L, 0L, Replica.ReplicaState.NORMAL, -1, version);
+        Replica stale = new Replica(2L, 2L, version, 0, 0L, 0L, Replica.ReplicaState.NORMAL, -1, version);
+        tablet.addReplica(fresh, false);
+        tablet.addReplica(stale, false);
+        fresh.updateRowCountAtVersion(100L, version);
+        // caught up with the version, but its count comes from a stat of an unknown version
+        stale.updateStat(0L, 150L, 1L, 0L);
+
+        // Tablet#getRowCount takes the largest count of any caught-up replica
+        Assertions.assertEquals(150L, tablet.getRowCount(version));
+        // the proven sum only takes the count proven at the version
+        Assertions.assertEquals(100L, TabletStatMgr.addProvenRowCount(0L, tablet, version));
+        Assertions.assertEquals(130L, TabletStatMgr.addProvenRowCount(30L, tablet, version));
+        Assertions.assertEquals(-1L, TabletStatMgr.addProvenRowCount(0L, tablet, version + 1));
+        Assertions.assertEquals(-1L, TabletStatMgr.addProvenRowCount(-1L, tablet, version));
+    }
 }

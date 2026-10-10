@@ -401,4 +401,22 @@ public class MaterializedIndexTest {
         Assertions.assertEquals(originalRange3.getLowerBound(), range3.getLowerBound());
         Assertions.assertEquals(originalRange3.getUpperBound(), range3.getUpperBound());
     }
+
+    @Test
+    public void testRowCountAtVersion() {
+        MaterializedIndex index = new MaterializedIndex(10);
+        index.setRowCount(100L);
+        Assertions.assertEquals(-1L, index.getRowCountAtVersion(5L));
+
+        index.setRowCount(120L, 5L);
+        Assertions.assertEquals(120L, index.getRowCountAtVersion(5L));
+        // exact version only: neither an older nor a newer visible version is answered
+        Assertions.assertEquals(-1L, index.getRowCountAtVersion(4L));
+        Assertions.assertEquals(-1L, index.getRowCountAtVersion(6L));
+
+        // a count of unknown version drops the proof
+        index.setRowCount(130L);
+        Assertions.assertEquals(130L, index.getRowCount());
+        Assertions.assertEquals(-1L, index.getRowCountAtVersion(5L));
+    }
 }

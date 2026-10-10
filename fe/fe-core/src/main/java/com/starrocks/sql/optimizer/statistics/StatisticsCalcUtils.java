@@ -20,6 +20,7 @@ import com.google.common.collect.Maps;
 import com.starrocks.catalog.Column;
 import com.starrocks.catalog.OlapTable;
 import com.starrocks.catalog.Partition;
+import com.starrocks.catalog.PhysicalPartition;
 import com.starrocks.catalog.Table;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.GlobalStateMgr;
@@ -242,7 +243,15 @@ public class StatisticsCalcUtils {
             LocalDateTime updateDatetime = StatisticUtils.getPartitionLastUpdateTime(partition);
 
             boolean needDelta;
-            if (tableStatistic.isEmpty()) {
+            // Only looked up for a partition whose analyzed count, if any, is out of date.
+            long provenRowCount = tableStatistic.isEmpty() || updateDatetime.isAfter(statsUpdateTime)
+                    ? provenBaseRowCount(partition) : -1L;
+            if (provenRowCount >= 0) {
+                // The partition changed since it was analyzed, but its row count was proven at its visible version
+                // (see provenBaseRowCount), so use it instead of estimating the change.
+                partitionRowCount = provenRowCount;
+                needDelta = false;
+            } else if (tableStatistic.isEmpty()) {
                 partitionRowCount = partition.getRowCount();
                 // tablet stats collection is async on both FE and BE.  Each BE and leader FE synchronize every 5 minutes by default.
                 // That is, BE collects all tablet information in the BE node's cache every 5 minutes, and then FE accesses
@@ -296,9 +305,12 @@ public class StatisticsCalcUtils {
                 updateQueryDumpInfo(optimizerContext, table, partition.getName(), partition.getRowCount());
             }
 
-            // attempt use updateRows from basicStatsMeta to adjust estimated row counts
+            // attempt use updateRows from basicStatsMeta to adjust estimated row counts, unless every selected
+            // partition's count is proven at its visible version: updateRows counts rows written, not rows in the
+            // table. Checked last, and it stops at the first partition without a proven count.
             if (StatsConstants.AnalyzeType.SAMPLE == analyzeType &&
-                    (basicStatsMeta.getUpdateTime().isAfter(lastWorkTimestamp) || rowCount == 0)) {
+                    (basicStatsMeta.getUpdateTime().isAfter(lastWorkTimestamp) || rowCount == 0) &&
+                    !allRowCountsProven(selectedPartitions)) {
                 long statsRowCount = Math.max(basicStatsMeta.getTotalRows() / table.getPartitions().size(), 1)
                         * selectedPartitions.size();
                 if (statsRowCount > rowCount) {
@@ -315,6 +327,33 @@ public class StatisticsCalcUtils {
         }
 
         return 1;
+    }
+
+    /**
+     * The partition's row count if every physical partition's base index count was proven at exactly its visible
+     * version, e.g. from the counts the BEs reported when that version was published; -1 otherwise. Only the
+     * base index is counted, like an analyzed row count: Partition#getRowCount also adds rollups and synchronous
+     * materialized views.
+     */
+    private static boolean allRowCountsProven(Collection<Partition> partitions) {
+        for (Partition partition : partitions) {
+            if (provenBaseRowCount(partition) < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static long provenBaseRowCount(Partition partition) {
+        long rowCount = 0L;
+        for (PhysicalPartition physicalPartition : partition.getSubPartitions()) {
+            long count = physicalPartition.getBaseIndex().getRowCountAtVersion(physicalPartition.getVisibleVersion());
+            if (count < 0) {
+                return -1L;
+            }
+            rowCount += count;
+        }
+        return rowCount;
     }
 
     private static @Nullable List<Partition> getSelectedPartitions(Operator node, OlapTable olapTable) {

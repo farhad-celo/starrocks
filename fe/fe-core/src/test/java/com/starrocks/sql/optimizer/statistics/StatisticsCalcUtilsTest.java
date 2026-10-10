@@ -17,6 +17,7 @@ package com.starrocks.sql.optimizer.statistics;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.starrocks.catalog.Column;
+import com.starrocks.catalog.MaterializedIndex;
 import com.starrocks.catalog.OlapTable;
 import com.starrocks.catalog.Partition;
 import com.starrocks.common.FeConstants;
@@ -246,5 +247,28 @@ public class StatisticsCalcUtilsTest {
 
         // When all partitions are dropped, selectedPartitions is empty, row count should be 1 (minimum)
         Assertions.assertEquals(1, rowCount);
+    }
+
+    @Test
+    public void testProvenBaseRowCount() {
+        MaterializedIndex baseIndex = new MaterializedIndex(10L);
+        Partition partition = new Partition(1L, 3L, "p", baseIndex, null);
+        MaterializedIndex rollup = new MaterializedIndex(11L, MaterializedIndex.IndexState.NORMAL);
+        partition.getDefaultPhysicalPartition().createRollupIndex(rollup);
+        long visibleVersion = partition.getDefaultPhysicalPartition().getVisibleVersion();
+
+        // nothing proven
+        baseIndex.setRowCount(100L);
+        Assertions.assertEquals(-1L, StatisticsCalcUtils.provenBaseRowCount(partition));
+
+        // proven at the visible version: the base index count, without the rollup Partition#getRowCount adds
+        baseIndex.setRowCount(100L, visibleVersion);
+        rollup.setRowCount(100L);
+        Assertions.assertEquals(100L, StatisticsCalcUtils.provenBaseRowCount(partition));
+        Assertions.assertEquals(200L, partition.getRowCount());
+
+        // a newer version became visible without a proven count for it
+        partition.getDefaultPhysicalPartition().updateVisibleVersion(visibleVersion + 1);
+        Assertions.assertEquals(-1L, StatisticsCalcUtils.provenBaseRowCount(partition));
     }
 }

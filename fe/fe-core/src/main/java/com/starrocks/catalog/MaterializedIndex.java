@@ -104,6 +104,10 @@ public class MaterializedIndex extends MetaObject implements Writable, GsonPostP
     private IndexState state;
     @SerializedName(value = "rowCount")
     private long rowCount;
+    // The partition version rowCount was proven at, i.e. every tablet's count was computed from exactly that
+    // version, or 0 if unknown. Not persisted: an FE that restarts falls back to treating the count as of
+    // unknown version until the next load or tablet stat round proves one again.
+    private volatile long rowCountVersion = 0;
 
     private Map<Long, Tablet> idToTablets;
     @SerializedName(value = "tablets")
@@ -280,12 +284,28 @@ public class MaterializedIndex extends MetaObject implements Writable, GsonPostP
         return this.state;
     }
 
-    public long getRowCount() {
+    public synchronized long getRowCount() {
         return rowCount;
     }
 
-    public void setRowCount(long rowCount) {
+    // A count of unknown version.
+    public synchronized void setRowCount(long rowCount) {
         this.rowCount = rowCount;
+        this.rowCountVersion = 0;
+    }
+
+    // A count every tablet proved was computed from exactly the partition version {@code version}.
+    public synchronized void setRowCount(long rowCount, long version) {
+        this.rowCount = rowCount;
+        this.rowCountVersion = version;
+    }
+
+    /**
+     * The index row count, but only if it was proven at exactly {@code version}; -1 otherwise. Exact
+     * equality for the same reason as {@link Replica#getRowCountAtVersion}.
+     */
+    public synchronized long getRowCountAtVersion(long version) {
+        return rowCountVersion > 0 && rowCountVersion == version ? rowCount : -1L;
     }
 
     public long getDataSize() {
