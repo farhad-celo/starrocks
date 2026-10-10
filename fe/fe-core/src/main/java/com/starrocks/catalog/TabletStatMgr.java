@@ -143,6 +143,9 @@ public class TabletStatMgr extends FrontendDaemon {
                 long minAdjacentTabletPairSize = Long.MAX_VALUE;
                 long maxAdaptiveSplitTabletSize = 0L;
                 Map<Pair<Long, Long>, Long> indexRowCountMap = Maps.newHashMap();
+                // (physical partition id, index id) -> (visible version, sum of the tablets' counts proven at it),
+                // for indexes whose every tablet proved its count at that version (see Tablet#getRowCountAtVersion)
+                Map<Pair<Long, Long>, Pair<Long, Long>> provenIndexRowCountMap = Maps.newHashMap();
                 // NOTE: calculate the row first with read lock, then update the stats with write lock
                 OlapTable olapTable = (OlapTable) table;
                 // Reshard is leader-only (TabletStatMgr runs on all FEs), and only for cloud-native
@@ -196,9 +199,14 @@ public class TabletStatMgr extends FrontendDaemon {
                                                 Config.tablet_reshard_target_size, adaptiveBound)
                                         : 0;
                                 long prevFreshTabletSize = -1L;
+                                // Sum of the counts proven at the version, or -1 once a tablet can't prove one. Kept
+                                // apart from indexRowCount, which takes the largest count of any caught-up replica,
+                                // possibly a stale one.
+                                long provenRowCount = 0L;
                                 // NOTE: can take a rather long time to iterate lots of tablets
                                 for (Tablet tablet : tablets) {
                                     indexRowCount += tablet.getRowCount(version);
+                                    provenRowCount = addProvenRowCount(provenRowCount, tablet, version);
                                     long dataSize = tablet.getDataSize(true);
                                     maxTabletSize = Math.max(maxTabletSize, dataSize);
                                     if (underProvisioned
@@ -219,6 +227,10 @@ public class TabletStatMgr extends FrontendDaemon {
                                 } // end for tablets
                                 indexRowCountMap.put(Pair.create(physicalPartition.getId(), index.getId()),
                                         indexRowCount);
+                                if (provenRowCount >= 0) {
+                                    provenIndexRowCountMap.put(Pair.create(physicalPartition.getId(), index.getId()),
+                                            Pair.create(version, provenRowCount));
+                                }
                                 if (!olapTable.isTempPartition(partition.getId())) {
                                     totalRowCount += indexRowCount;
                                 }
@@ -238,9 +250,18 @@ public class TabletStatMgr extends FrontendDaemon {
                         for (PhysicalPartition physicalPartition : partition.getSubPartitions()) {
                             for (MaterializedIndex index :
                                     physicalPartition.getLatestMaterializedIndices(IndexExtState.VISIBLE)) {
-                                Long indexRowCount =
-                                        indexRowCountMap.get(Pair.create(physicalPartition.getId(), index.getId()));
-                                if (indexRowCount != null) {
+                                Pair<Long, Long> key = Pair.create(physicalPartition.getId(), index.getId());
+                                Long indexRowCount = indexRowCountMap.get(key);
+                                Pair<Long, Long> proven = provenIndexRowCountMap.get(key);
+                                long visibleVersion = physicalPartition.getVisibleVersion();
+                                if (indexRowCount == null) {
+                                    continue;
+                                }
+                                if (proven != null && proven.first == visibleVersion) {
+                                    index.setRowCount(proven.second, proven.first);
+                                } else if (index.getRowCountAtVersion(visibleVersion) < 0) {
+                                    // Don't replace a count proven at the visible version, e.g. set when that
+                                    // version was published, with one this round could not prove.
                                     index.setRowCount(indexRowCount);
                                 }
                             }
@@ -340,6 +361,19 @@ public class TabletStatMgr extends FrontendDaemon {
                 }
             }
         }
+    }
+
+    /**
+     * Adds the tablet's count proven at exactly {@code version} to {@code provenRowCount}, the running sum over an
+     * index's tablets; -1 once any tablet can't prove one. The proven count is the one a stat or a publish
+     * recorded for that version, not {@link Tablet#getRowCount}'s largest count of any caught-up replica.
+     */
+    static long addProvenRowCount(long provenRowCount, Tablet tablet, long version) {
+        if (provenRowCount < 0) {
+            return -1L;
+        }
+        long tabletRowCount = tablet.getRowCountAtVersion(version);
+        return tabletRowCount >= 0 ? provenRowCount + tabletRowCount : -1L;
     }
 
     private void adjustStatUpdateRows(long tableId, long totalRowCount) {

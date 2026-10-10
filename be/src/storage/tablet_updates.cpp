@@ -510,6 +510,24 @@ int64_t TabletUpdates::min_readable_version() const {
     return _edit_version_infos.empty() ? 0 : _edit_version_infos.front()->version.major_number();
 }
 
+std::pair<int64_t, int64_t> TabletUpdates::num_live_rows_and_version() const {
+    std::lock_guard rl(_lock);
+    if (_edit_version_infos.empty() || _apply_version_idx + 1 != _edit_version_infos.size()) {
+        return {-1, -1};
+    }
+    std::lock_guard lg(_rowset_stats_lock);
+    const auto& last = _edit_version_infos.back();
+    int64_t live_rows = 0;
+    for (uint32_t rowsetid : last->rowsets) {
+        auto itr = _rowset_stats.find(rowsetid);
+        if (itr == _rowset_stats.end()) {
+            return {-1, -1};
+        }
+        live_rows += static_cast<int64_t>(itr->second->num_rows - itr->second->num_dels);
+    }
+    return {live_rows, last->version.major_number()};
+}
+
 int64_t TabletUpdates::max_readable_version() const {
     std::lock_guard rl(_lock);
     return _edit_version_infos.empty() ? 0 : _edit_version_infos[_apply_version_idx]->version.major_number();

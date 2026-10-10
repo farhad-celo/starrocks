@@ -598,6 +598,37 @@ void TabletUpdatesTest::test_writeread_with_delete(bool enable_persistent_index)
     ASSERT_EQ(N, read_tablet(_tablet, 4));
 }
 
+TEST_F(TabletUpdatesTest, num_live_rows_and_version) {
+    _tablet = create_tablet(rand(), rand());
+    const int N = 1000;
+    std::vector<int64_t> keys;
+    for (int i = 0; i < N; i++) {
+        keys.emplace_back(i);
+    }
+    ASSERT_TRUE(_tablet->rowset_commit(2, create_rowset(_tablet, keys)).ok());
+    ASSERT_EQ(N, read_tablet(_tablet, 2));
+    auto [rows, version] = _tablet->updates()->num_live_rows_and_version();
+    ASSERT_EQ(N, rows);
+    ASSERT_EQ(2, version);
+
+    // upserting every key keeps the live row count, unlike num_rows() which counts the replaced rows too
+    ASSERT_TRUE(_tablet->rowset_commit(3, create_rowset(_tablet, keys)).ok());
+    ASSERT_EQ(N, read_tablet(_tablet, 3));
+    std::tie(rows, version) = _tablet->updates()->num_live_rows_and_version();
+    ASSERT_EQ(N, rows);
+    ASSERT_EQ(3, version);
+    ASSERT_EQ(2 * N, _tablet->updates()->num_rows());
+
+    // deleting half of the keys
+    Int64Column deletes;
+    deletes.append_numbers(keys.data(), sizeof(int64_t) * keys.size() / 2);
+    ASSERT_TRUE(_tablet->rowset_commit(4, create_rowset(_tablet, {}, &deletes)).ok());
+    ASSERT_EQ(N / 2, read_tablet(_tablet, 4));
+    std::tie(rows, version) = _tablet->updates()->num_live_rows_and_version();
+    ASSERT_EQ(N / 2, rows);
+    ASSERT_EQ(4, version);
+}
+
 TEST_F(TabletUpdatesTest, writeread_with_delete) {
     test_writeread_with_delete(false);
 }

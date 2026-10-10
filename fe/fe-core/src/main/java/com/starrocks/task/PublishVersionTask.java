@@ -58,6 +58,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -89,6 +90,11 @@ public class PublishVersionTask extends AgentTask {
     // PartitionCommitInfos: that races with the publish daemon snapshotting the transaction state
     // and used to throw ConcurrentModificationException out of the daemon (issue #77595).
     private Map<Long, Map<Long, TabletStatPB>> firstLoadTabletStats = Collections.emptyMap();
+
+    // Row counts this BE reported with the tablet versions in its publish response: tablet id -> (version, row
+    // count at exactly that version). Guarded by the task monitor like firstLoadTabletStats, and applied to the
+    // replicas by the thread finishing the transaction.
+    private Map<Long, long[]> publishedTabletRowCounts = Collections.emptyMap();
 
     public PublishVersionTask(long backendId, long transactionId, long globalTransactionId, long dbId, long commitTimestamp,
                               List<TPartitionVersionInfo> partitionVersionInfos, String traceParent, Span txnSpan,
@@ -204,6 +210,67 @@ public class PublishVersionTask extends AgentTask {
         return firstLoadTabletStats;
     }
 
+    /**
+     * Record the row counts this BE reported with the published tablet versions. Called from the thrift
+     * finishTask handler thread; like {@link #collectFirstLoadTabletStats}, it only writes this task's own state.
+     */
+    public void collectPublishedTabletRowCounts(List<TTabletVersionPair> tabletVersions) {
+        if (tabletVersions == null || tabletVersions.isEmpty()) {
+            return;
+        }
+        Map<Long, long[]> counts = new HashMap<>();
+        for (TTabletVersionPair tabletVersion : tabletVersions) {
+            if (tabletVersion.isSetRow_count() && tabletVersion.isSetVersion()) {
+                counts.put(tabletVersion.getTablet_id(),
+                        new long[] {tabletVersion.getVersion(), tabletVersion.getRow_count()});
+            }
+        }
+        setPublishedTabletRowCounts(counts);
+    }
+
+    private synchronized void setPublishedTabletRowCounts(Map<Long, long[]> counts) {
+        this.publishedTabletRowCounts = counts;
+    }
+
+    /**
+     * Set the reported row counts on this backend's replicas, each together with the version it was computed
+     * at, see {@link Replica#updateRowCountAtVersion}. Called by the thread finishing the transaction, which
+     * holds the table write lock.
+     */
+    public void applyPublishedTabletRowCounts() {
+        Map<Long, long[]> counts;
+        synchronized (this) {
+            counts = publishedTabletRowCounts;
+        }
+        if (counts.isEmpty()) {
+            return;
+        }
+        Map<Long, Replica> replicas = replicasOnThisBackend(counts.keySet());
+        for (Map.Entry<Long, long[]> entry : counts.entrySet()) {
+            Replica replica = replicas.get(entry.getKey());
+            if (replica != null) {
+                replica.updateRowCountAtVersion(entry.getValue()[1], entry.getValue()[0]);
+            }
+        }
+    }
+
+    /**
+     * This backend's replica of each tablet, keyed by tablet id. A tablet dropped since the publish, e.g. by an
+     * alter, has no entry. Keyed rather than positional on purpose: TabletInvertedIndex leaves missing replicas
+     * out, so a positional list would pair later tablets with the wrong replica.
+     */
+    private Map<Long, Replica> replicasOnThisBackend(Collection<Long> tabletIds) {
+        TabletInvertedIndex invertedIndex = GlobalStateMgr.getCurrentState().getTabletInvertedIndex();
+        Map<Long, Replica> replicas = new HashMap<>();
+        for (Long tabletId : tabletIds) {
+            Replica replica = invertedIndex.getReplica(tabletId, backendId);
+            if (replica != null) {
+                replicas.put(tabletId, replica);
+            }
+        }
+        return replicas;
+    }
+
     public synchronized void setErrorTablets(List<Long> errorTablets) {
         this.errorTablets.clear();
         if (errorTablets != null) {
@@ -250,8 +317,8 @@ public class PublishVersionTask extends AgentTask {
         }
         TabletInvertedIndex tablets = GlobalStateMgr.getCurrentState().getTabletInvertedIndex();
         List<Long> tabletIds = tabletVersions.stream().map(tv -> tv.tablet_id).collect(Collectors.toList());
-        List<Replica> replicas = tablets.getReplicasOnBackendByTabletIds(tabletIds, backendId);
-        if (replicas == null) {
+        Map<Long, Replica> replicas = replicasOnThisBackend(tabletIds);
+        if (replicas.isEmpty()) {
             LOG.warn("backend not found or no replicas on backend, backendid={}", backendId);
             return;
         }
@@ -261,9 +328,9 @@ public class PublishVersionTask extends AgentTask {
             return;
         }
         List<Long> droppedTablets = new ArrayList<>();
-        for (int i = 0; i < tabletVersions.size(); i++) {
-            if (replicas.get(i) == null) {
-                droppedTablets.add(tabletVersions.get(i).tablet_id);
+        for (TTabletVersionPair tabletVersion : tabletVersions) {
+            if (!replicas.containsKey(tabletVersion.tablet_id)) {
+                droppedTablets.add(tabletVersion.tablet_id);
             }
         }
         if (!droppedTablets.isEmpty()) {
@@ -284,9 +351,8 @@ public class PublishVersionTask extends AgentTask {
         locker.lockTablesWithIntensiveDbLock(db.getId(), tableIdList, LockType.WRITE);
         try {
             // TODO: persistent replica version
-            for (int i = 0; i < tabletVersions.size(); i++) {
-                TTabletVersionPair tabletVersion = tabletVersions.get(i);
-                Replica replica = replicas.get(i);
+            for (TTabletVersionPair tabletVersion : tabletVersions) {
+                Replica replica = replicas.get(tabletVersion.tablet_id);
                 if (replica == null) {
                     continue;
                 }

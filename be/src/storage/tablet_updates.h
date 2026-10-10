@@ -134,6 +134,11 @@ public:
     // get number of rows and total size of latest version's rowset files together
     std::pair<int64_t, int64_t> num_rows_and_data_size() const;
 
+    // Number of live rows (rows minus deleted rows) and the version they describe, or -1 for both when
+    // the tablet is not fully applied: num_dels of a rowset is only known once it is applied, so an
+    // unapplied version would be counted without the rows it replaces.
+    std::pair<int64_t, int64_t> num_live_rows_and_version() const;
+
     // get latest version's number of rowsets
     size_t num_rowsets() const;
 

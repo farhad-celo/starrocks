@@ -173,5 +173,29 @@ public class ReplicaTest {
         originalReplica.setChecksum(1024);
         assertEquals(1024, originalReplica.getChecksum());
     }
-}
 
+    @Test
+    public void testUpdateRowCountAtVersion() {
+        Replica replica = new Replica(1L, 2L, 10L, 0, 100L, 1000L, Replica.ReplicaState.NORMAL, -1, 10L);
+        Assertions.assertEquals(-1L, replica.getRowCountAtVersion(11L));
+
+        replica.updateRowCountAtVersion(1500L, 11L);
+        Assertions.assertEquals(1500L, replica.getRowCount());
+        Assertions.assertEquals(1500L, replica.getRowCountAtVersion(11L));
+        Assertions.assertEquals(-1L, replica.getRowCountAtVersion(10L));
+
+        // a later stat of unknown version drops the proof, as for any count without a version
+        replica.updateStat(90L, 1400L, 3L, 0L);
+        Assertions.assertEquals(-1L, replica.getRowCountAtVersion(11L));
+    }
+
+    @Test
+    public void testOlderPublishedRowCountDoesNotReplaceNewer() {
+        Replica replica = new Replica(1L, 2L, 12L, 0, 100L, 1000L, Replica.ReplicaState.NORMAL, -1, 12L);
+        replica.updateStat(100L, 1200L, 3L, 12L);
+        // e.g. a retried finish re-applying the count published for version 11
+        replica.updateRowCountAtVersion(1100L, 11L);
+        Assertions.assertEquals(1200L, replica.getRowCountAtVersion(12L));
+        Assertions.assertEquals(-1L, replica.getRowCountAtVersion(11L));
+    }
+}
