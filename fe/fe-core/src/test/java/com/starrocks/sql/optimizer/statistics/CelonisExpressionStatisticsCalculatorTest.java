@@ -2113,4 +2113,47 @@ public class CelonisExpressionStatisticsCalculatorTest {
 
         assertThat(columnStatistic.isUnknown()).isTrue();
     }
+
+    @Test
+    public void testCelonisTimeunitsBetweenCalendarWithConstantTimeUnit() {
+        // GIVEN
+        final var multiaryTestScenario = multiaryTestScenario();
+        final var statistics = multiaryTestScenario.statistics;
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_TIMEUNITS_BETWEEN_CALENDAR, Type.DOUBLE,
+                Lists.newArrayList(multiaryTestScenario.datetimeColumnRefOperator,
+                        multiaryTestScenario.datetimeColumnRefOperator, new ConstantOperator("DAYS", Type.VARCHAR),
+                        multiaryTestScenario.stringArrayColumnRefOperator, new ConstantOperator("factory", Type.VARCHAR)));
+
+        // WHEN
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
+
+        assertEquals(3141085.0, columnStatistic.getMaxValue(), 0.001);
+        assertEquals(-3141085.0, columnStatistic.getMinValue(), 0.001);
+        // 1 - (1-0.2)^3 = 0.488
+        assertEquals(0.488, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(8, columnStatistic.getAverageRowSize(), 0.001);
+        assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+    }
+
+    @Test
+    public void testCelonisTimeunitsBetweenCalendarWithNonConstantTimeUnit() {
+        // GIVEN
+        final var multiaryTestScenario = multiaryTestScenario();
+        final var statistics = multiaryTestScenario.statistics;
+        final var callOperator = new CallOperator(FunctionSet.CELONIS_TIMEUNITS_BETWEEN_CALENDAR, Type.DOUBLE,
+                Lists.newArrayList(multiaryTestScenario.datetimeColumnRefOperator,
+                        multiaryTestScenario.datetimeColumnRefOperator, multiaryTestScenario.stringColumnRefOperator,
+                        multiaryTestScenario.stringArrayColumnRefOperator, new ConstantOperator("factory", Type.VARCHAR)));
+
+        // WHEN
+        final var columnStatistic = ExpressionStatisticCalculator.calculate(callOperator, statistics);
+
+        // THEN
+        assertEquals(271389744000000.0, columnStatistic.getMaxValue(), 0.001);
+        assertEquals(-271389744000000.0, columnStatistic.getMinValue(), 0.001);
+        // 1 - (1-0.2)^4 = 0.5904
+        assertEquals(0.5904, columnStatistic.getNullsFraction(), 0.001);
+        assertEquals(8, columnStatistic.getAverageRowSize(), 0.001);
+        assertEquals(80, columnStatistic.getDistinctValuesCount(), 0.001);
+    }
 }

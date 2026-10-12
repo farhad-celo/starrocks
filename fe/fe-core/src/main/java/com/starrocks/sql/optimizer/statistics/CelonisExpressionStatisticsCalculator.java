@@ -30,6 +30,10 @@ import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.optimizer.rewrite.celonis.CelonisHashCalculationException;
 import org.apache.commons.math3.distribution.NormalDistribution;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.Month;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -661,6 +665,13 @@ public class CelonisExpressionStatisticsCalculator {
         return operator.castTo(Type.VARCHAR).map(ConstantOperator::toString);
     }
 
+    // Calculates the probability of at least one child being NULL
+    private static double calculateCombinedNullFraction(List<ColumnStatistic> childrenColumnStatistics) {
+        return 1.0 - childrenColumnStatistics.stream() //
+                .mapToDouble(childStat -> 1.0 - childStat.getNullsFraction()) //
+                .reduce(1.0, (firstNullFraction, secondNullFraction) -> firstNullFraction * secondNullFraction);
+    }
+
     private static ColumnStatistic multiaryExpressionCalculate(CallOperator callOperator,
                                                                List<ColumnStatistic> childrenColumnStatistics,
                                                                Statistics inputStatistics, double rowCount) {
@@ -708,9 +719,7 @@ public class CelonisExpressionStatisticsCalculator {
                         .max() //
                         .orElse(ColumnStatistic.unknown().getDistinctValuesCount());
                 // Probability of at least one child being NULL
-                double combinedNullsFraction = 1.0 - childrenColumnStatistics.stream() //
-                        .mapToDouble(childStat -> 1.0 - childStat.getNullsFraction()) //
-                        .reduce(1.0, (firstNullFraction, secondNullFraction) -> firstNullFraction * secondNullFraction);
+                double combinedNullsFraction = calculateCombinedNullFraction(childrenColumnStatistics);
                 return ColumnStatistic.builder() //
                         .setMinValue(LargeIntLiteral.LARGE_INT_MIN.doubleValue()) //
                         .setMaxValue(LargeIntLiteral.LARGE_INT_MAX.doubleValue()) //
@@ -722,11 +731,12 @@ public class CelonisExpressionStatisticsCalculator {
             case FunctionSet.CELONIS_SORTED_FIRST:
             case FunctionSet.CELONIS_SORTED_LAST:
                 return calculateCelonisSortedFirstLast(callOperator, firstChildStats, rowCount);
+            case FunctionSet.CELONIS_TIMEUNITS_BETWEEN_CALENDAR:
+                return calculateCelonisTimeunitsBetweenStats(callOperator, childrenColumnStatistics, rowCount);
             default:
                 return null;
         }
     }
-
 
     /**
      * Computes the statistics of a multi-argument, non-nullable Celonis hash call. The MCVs of the arguments are
@@ -792,5 +802,54 @@ public class CelonisExpressionStatisticsCalculator {
                 .setAverageRowSize(averageRowSize) //
                 .build();
 
+    }
+
+    // Timestamps are in the range [1400-01-01, 10000-01-01)
+    // Sonar flags either form of conversion, so suppress it
+    private static final double MAX_SECONDS_BETWEEN_VALID_TIMESTAMPS = Duration.between(// NOSONAR
+            LocalDateTime.of(1400, Month.JANUARY, 1, 0, 0).atZone(ZoneOffset.UTC),
+            LocalDateTime.of(10000, Month.JANUARY, 1, 0, 0).atZone(ZoneOffset.UTC)).getSeconds();
+
+    private static final Map<String, Double> MAX_TIMEUNITS_BETWEEN_VALUE = Map.of(
+            "WORKDAYS", Math.floor(MAX_SECONDS_BETWEEN_VALID_TIMESTAMPS / 86400d),
+            "DAYS", MAX_SECONDS_BETWEEN_VALID_TIMESTAMPS / 86400d,
+            "HOURS", MAX_SECONDS_BETWEEN_VALID_TIMESTAMPS / 3600d,
+            "MINUTES", MAX_SECONDS_BETWEEN_VALID_TIMESTAMPS / 60d,
+            "SECONDS", MAX_SECONDS_BETWEEN_VALID_TIMESTAMPS,
+            "MILLISECONDS", MAX_SECONDS_BETWEEN_VALID_TIMESTAMPS * 1000d
+    );
+
+    private static ColumnStatistic calculateCelonisTimeunitsBetweenStats(CallOperator callOperator,
+                                                                  List<ColumnStatistic> childrenColumnStatistics,
+                                                                  double rowCount) {
+        if (childrenColumnStatistics.stream().anyMatch(ColumnStatistic::isUnknown)) {
+            return null;
+        }
+
+        // Use milliseconds as default as it has the biggest range
+        double maxValue = MAX_TIMEUNITS_BETWEEN_VALUE.get("MILLISECONDS");
+        // If the timeUnit is constant we can tighten the bounds
+        ScalarOperator timeUnitOperator = callOperator.getChild(2);
+        if (timeUnitOperator instanceof ConstantOperator timeUnitConstant && !timeUnitConstant.isNull()) {
+            maxValue = MAX_TIMEUNITS_BETWEEN_VALUE.getOrDefault(
+                    timeUnitConstant.getVarchar().toUpperCase(), maxValue);
+        }
+        double minValue = -maxValue;
+
+        // If either from_timestamp, to_timestamp, time_unit or calendar is null, so is the result
+        double nullFraction = calculateCombinedNullFraction(childrenColumnStatistics.subList(0, 4));
+
+        double maxNdv = Math.min(rowCount, childrenColumnStatistics.stream()
+                .mapToDouble(ColumnStatistic::getDistinctValuesCount)
+                .max()
+                .orElse(ColumnStatistic.unknown().getDistinctValuesCount()));
+
+        return ColumnStatistic.builder()
+                .setMinValue(minValue)
+                .setMaxValue(maxValue)
+                .setNullsFraction(nullFraction)
+                .setAverageRowSize(callOperator.getType().getTypeSize())
+                .setDistinctValuesCount(maxNdv)
+                .build();
     }
 }

@@ -537,6 +537,7 @@ public class FunctionSet {
     // Celonis functions:
     public static final String MULTI_ARRAY_AGG = "multi_array_agg";
     public static final String CELONIS_ADJUST_DAILY_TIMESTAMPS = "celonis_adjust_daily_timestamps";
+    public static final String CELONIS_TIMEUNITS_BETWEEN_CALENDAR = "celonis_timeunits_between_calendar";
     public static final String CELONIS_ALIGN_MODEL = "celonis_align_model";
     public static final String CELONIS_ALIGN_MODEL_V2 = "celonis_align_model_v2";
     public static final String CELONIS_ARRAY_AVG = "celonis_array_avg";
