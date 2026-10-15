@@ -135,6 +135,18 @@ public abstract class PropertyDeriverBase<R, C> extends OperatorVisitor<R, C> {
         return Optional.of(positions);
     }
 
+    public static boolean sameColumnIds(List<DistributionCol> left, List<DistributionCol> right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (int i = 0; i < left.size(); ++i) {
+            if (left.get(i).getColId() != right.get(i).getColId()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public static List<DistributionCol> toDistributionCols(List<ColumnRefOperator> columns) {
         return columns.stream().map(col -> new DistributionCol(col.getId(), true)).collect(Collectors.toList());
     }
@@ -166,11 +178,16 @@ public abstract class PropertyDeriverBase<R, C> extends OperatorVisitor<R, C> {
     // colocated. Required columns that are not a plain union output column (e.g. computed by the union's
     // projection) are dropped; a hash distribution on a subset of the required columns still satisfies the
     // requirement. Returns empty when the option does not apply.
+    // With enable_shuffle_union_all the same option also serves children that aren't colocated: each one is then
+    // shuffled on its column at those positions straight into the parent's fragment (see
+    // ChildOutputPropertyGuarantor.transToShuffleUnion), instead of being sent round-robin to the union and
+    // shuffled once more above it.
     protected static Optional<List<PhysicalPropertySet>> computeColocateUnionAllRequiredProperties(
             PhysicalUnionOperator node, PhysicalPropertySet requiredFromParent, SessionVariable sessionVariable,
             GroupExpression groupExpression) {
-        if (!sessionVariable.isEnableColocateUnionAll() || sessionVariable.isDisableColocateSet() ||
-                !node.isUnionAll() || node.hasLimit()) {
+        boolean colocate = sessionVariable.isEnableColocateUnionAll() && !sessionVariable.isDisableColocateSet();
+        boolean shuffle = sessionVariable.isEnableShuffleUnionAll();
+        if ((!colocate && !shuffle) || !node.isUnionAll() || node.hasLimit()) {
             return Optional.empty();
         }
         DistributionSpec requiredSpec = requiredFromParent.getDistributionProperty().getSpec();
@@ -182,6 +199,49 @@ public abstract class PropertyDeriverBase<R, C> extends OperatorVisitor<R, C> {
             return Optional.empty();
         }
 
+        Optional<UnionAllRequiredPositions> required = unionAllRequiredPositions(node, requiredDesc);
+        if (required.isEmpty()) {
+            return Optional.empty();
+        }
+        List<DistributionCol> requiredCols = required.get().requiredCols;
+        List<Integer> positions = required.get().positions;
+        // Shuffled children are hashed on exactly these columns, so the union output only satisfies the parent if
+        // they cover all of its required columns. Colocated ones are LOCAL, which also satisfies a subset.
+        boolean shuffleApplies = shuffle && required.get().coversAll;
+        boolean colocateApplies = colocate && childrenAreColocateScansBucketedOn(node, groupExpression, positions);
+        if (!shuffleApplies && !colocateApplies) {
+            return Optional.empty();
+        }
+
+        List<PhysicalPropertySet> requiredProperties = Lists.newArrayList();
+        for (List<ColumnRefOperator> childOutputColumns : node.getChildOutputColumns()) {
+            List<DistributionCol> childCols = Lists.newArrayList();
+            for (int i = 0; i < positions.size(); ++i) {
+                childCols.add(requiredCols.get(i).updateColId(childOutputColumns.get(positions.get(i)).getId()));
+            }
+            HashDistributionSpec childSpec = DistributionSpec.createHashDistributionSpec(
+                    new HashDistributionDesc(childCols, requiredDesc.getSourceType()));
+            requiredProperties.add(new PhysicalPropertySet(DistributionProperty.createProperty(childSpec)));
+        }
+        return Optional.of(requiredProperties);
+    }
+
+    // The parent's required columns that are plain union output columns, and their union positions.
+    public static final class UnionAllRequiredPositions {
+        public final List<DistributionCol> requiredCols;
+        public final List<Integer> positions;
+        // whether every required column is at some union position
+        public final boolean coversAll;
+
+        UnionAllRequiredPositions(List<DistributionCol> requiredCols, List<Integer> positions, boolean coversAll) {
+            this.requiredCols = requiredCols;
+            this.positions = positions;
+            this.coversAll = coversAll;
+        }
+    }
+
+    public static Optional<UnionAllRequiredPositions> unionAllRequiredPositions(PhysicalSetOperation node,
+                                                                               HashDistributionDesc requiredDesc) {
         // column id seen by the parent -> position in the union output
         List<ColumnRefOperator> outputColumns = node.getOutputColumnRefOp();
         Map<Integer, Integer> outputIdToPosition = Maps.newHashMap();
@@ -205,28 +265,43 @@ public abstract class PropertyDeriverBase<R, C> extends OperatorVisitor<R, C> {
 
         List<DistributionCol> requiredCols = Lists.newArrayList();
         List<Integer> positions = Lists.newArrayList();
+        boolean coversAll = true;
         for (DistributionCol col : requiredDesc.getDistributionCols()) {
             Integer position = visibleIdToPosition.get(col.getColId());
-            if (position != null && !positions.contains(position)) {
+            if (position == null) {
+                coversAll = false;
+            } else if (!positions.contains(position)) {
                 positions.add(position);
                 requiredCols.add(col);
             }
         }
-        if (positions.isEmpty() || !childrenAreColocateScansBucketedOn(node, groupExpression, positions)) {
+        if (positions.isEmpty()) {
             return Optional.empty();
         }
+        return Optional.of(new UnionAllRequiredPositions(requiredCols, positions, coversAll));
+    }
 
-        List<PhysicalPropertySet> requiredProperties = Lists.newArrayList();
-        for (List<ColumnRefOperator> childOutputColumns : node.getChildOutputColumns()) {
-            List<DistributionCol> childCols = Lists.newArrayList();
-            for (int i = 0; i < positions.size(); ++i) {
-                childCols.add(requiredCols.get(i).updateColId(childOutputColumns.get(positions.get(i)).getId()));
-            }
-            HashDistributionSpec childSpec = DistributionSpec.createHashDistributionSpec(
-                    new HashDistributionDesc(childCols, requiredDesc.getSourceType()));
-            requiredProperties.add(new PhysicalPropertySet(DistributionProperty.createProperty(childSpec)));
+    // The columns each child of a shuffled UNION ALL is hashed on: its own columns at the parent's required union
+    // positions, null strict as every exchange is. Empty if the parent's requirement doesn't map to union positions.
+    public static Optional<List<List<DistributionCol>>> unionAllShuffleColumns(PhysicalSetOperation node,
+                                                                              PhysicalPropertySet requiredFromParent) {
+        DistributionSpec requiredSpec = requiredFromParent.getDistributionProperty().getSpec();
+        if (!(requiredSpec instanceof HashDistributionSpec) ||
+                !((HashDistributionSpec) requiredSpec).getHashDistributionDesc().isShuffle()) {
+            return Optional.empty();
         }
-        return Optional.of(requiredProperties);
+        Optional<UnionAllRequiredPositions> required =
+                unionAllRequiredPositions(node, ((HashDistributionSpec) requiredSpec).getHashDistributionDesc());
+        if (required.isEmpty() || !required.get().coversAll) {
+            return Optional.empty();
+        }
+        List<List<DistributionCol>> shuffleColumns = Lists.newArrayList();
+        for (List<ColumnRefOperator> childOutputColumns : node.getChildOutputColumns()) {
+            shuffleColumns.add(required.get().positions.stream()
+                    .map(position -> new DistributionCol(childOutputColumns.get(position).getId(), true))
+                    .collect(Collectors.toList()));
+        }
+        return Optional.of(shuffleColumns);
     }
 
     // Cheap pre-check so that a UNION ALL doesn't optimize its children twice for nothing: every child must read

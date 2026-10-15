@@ -45,6 +45,7 @@ import com.starrocks.sql.optimizer.operator.physical.PhysicalUnionOperator;
 import com.starrocks.sql.optimizer.task.TaskContext;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -340,6 +341,34 @@ public class ChildOutputPropertyGuarantor extends PropertyDeriverBase<Void, Expr
         return canColocate(firstHashSpec, otherHashSpec, firstShuffleColumns, otherShuffleColumns);
     }
 
+    // The hashed option (computeColocateUnionAllRequiredProperties) asked each child for a hash distribution on its
+    // column at the parent's required union positions. Every child then comes back either hash shuffled on those
+    // columns or LOCAL: a scan's bucket layout satisfies the requirement, while any other distribution gets a hash
+    // exchange from the optimizer. The round-robin option gets no hash-distributed child.
+    private boolean isShuffleUnionAllOption(PhysicalSetOperation node) {
+        return childrenOutputProperties.stream().allMatch(p -> p.getDistributionProperty().isShuffle() &&
+                !((HashDistributionSpec) p.getDistributionProperty().getSpec()).getHashDistributionDesc()
+                        .isBucketJoin());
+    }
+
+    // Shuffle each child of a UNION ALL by its column at the parent's required positions, so that the union runs in
+    // the parent's fragment and every row crosses the network once. Children already hash shuffled on exactly those
+    // columns keep their exchange; LOCAL ones (bucket placement, not the shuffle hash) get one.
+    private Void transToShuffleUnion(PhysicalSetOperation node, ExpressionContext context,
+                                     List<List<DistributionCol>> shuffleColumns) {
+        for (int i = 0; i < childrenOutputProperties.size(); ++i) {
+            HashDistributionSpec childSpec =
+                    (HashDistributionSpec) childrenOutputProperties.get(i).getDistributionProperty().getSpec();
+            List<DistributionCol> columns = shuffleColumns.get(i);
+            if (childSpec.getHashDistributionDesc().isLocal() ||
+                    !sameColumnIds(childSpec.getShuffleColumns(), columns)) {
+                enforceChildShuffleDistribution(columns, childrenBestExprList.get(i), childrenOutputProperties.get(i),
+                        i);
+            }
+        }
+        return visitOperator(node, context);
+    }
+
     private Void transToRoundRobinUnion(PhysicalSetOperation node, ExpressionContext context) {
         for (int i = 0; i < childrenOutputProperties.size(); ++i) {
             if (childrenOutputProperties.get(i).getDistributionProperty().getSpec().getType()
@@ -381,6 +410,12 @@ public class ChildOutputPropertyGuarantor extends PropertyDeriverBase<Void, Expr
             if (sessionVariable.isEnableColocateUnionAll() && !sessionVariable.isDisableColocateSet() &&
                     canColocateUnionAll((PhysicalUnionOperator) node)) {
                 return visitOperator(node, context);
+            }
+            if (sessionVariable.isEnableShuffleUnionAll() && isShuffleUnionAllOption(node)) {
+                Optional<List<List<DistributionCol>>> shuffleColumns = unionAllShuffleColumns(node, requirements);
+                if (shuffleColumns.isPresent()) {
+                    return transToShuffleUnion(node, context, shuffleColumns.get());
+                }
             }
             // Also when the colocated option didn't work out: the round-robin exchanges replace the hash exchanges
             // added for it, so this is the same plan as the round-robin option, which is costed before it.

@@ -199,6 +199,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String DISABLE_COLOCATE_JOIN = "disable_colocate_join";
     public static final String DISABLE_COLOCATE_SET = "disable_colocate_set";
     public static final String ENABLE_COLOCATE_UNION_ALL = "enable_colocate_union_all";
+    public static final String ENABLE_SHUFFLE_UNION_ALL = "enable_shuffle_union_all";
     public static final String DISABLE_BUCKET_JOIN = "disable_bucket_join";
     public static final String PARALLEL_FRAGMENT_EXEC_INSTANCE_NUM = "parallel_fragment_exec_instance_num";
     public static final String MAX_PARALLEL_SCAN_INSTANCE_NUM = "max_parallel_scan_instance_num";
@@ -1298,6 +1299,12 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     // so that a join or aggregation above it on the bucket columns can run colocated instead of shuffling.
     @VariableMgr.VarAttr(name = ENABLE_COLOCATE_UNION_ALL)
     private boolean enableColocateUnionAll = false;
+
+    // Let a UNION ALL below a hash-distributed parent (e.g. a shuffle join or aggregation) shuffle each child by
+    // the parent's keys straight into the parent's fragment, instead of sending them round-robin to the union and
+    // shuffling the union's output again.
+    @VariableMgr.VarAttr(name = ENABLE_SHUFFLE_UNION_ALL)
+    private boolean enableShuffleUnionAll = false;
     @VariableMgr.VarAttr(name = CBO_USE_CORRELATED_JOIN_ESTIMATE, flag = VariableMgr.INVISIBLE)
     private boolean useCorrelatedJoinEstimate = true;
 
@@ -3678,6 +3685,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnableColocateUnionAll(boolean value) {
         enableColocateUnionAll = value;
+    }
+
+    public boolean isEnableShuffleUnionAll() {
+        return enableShuffleUnionAll;
+    }
+
+    public void setEnableShuffleUnionAll(boolean value) {
+        enableShuffleUnionAll = value;
     }
 
     public int getParallelExecInstanceNum() {

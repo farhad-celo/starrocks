@@ -289,6 +289,8 @@ public class OutputPropertyDeriver extends PropertyDeriverBase<PhysicalPropertyS
             PhysicalPropertySet propertySet =
                     new PhysicalPropertySet(DistributionProperty.createProperty(hashDistSpec));
             return mergeCTEProperty(propertySet);
+        } else if (node instanceof PhysicalUnionOperator && ((PhysicalUnionOperator) node).isUnionAll()) {
+            return mergeCTEProperty(computeShuffleUnionAllOutputProperty(node, context));
         } else {
             List<Integer> columnIds = node.getOutputColumnRefOp().stream()
                     .map(ColumnRefOperator::getId)
@@ -299,6 +301,38 @@ public class OutputPropertyDeriver extends PropertyDeriverBase<PhysicalPropertyS
                     new PhysicalPropertySet(DistributionProperty.createProperty(hashDistSpec));
             return mergeCTEProperty(propertySet);
         }
+    }
+
+    // A UNION ALL whose children ChildOutputPropertyGuarantor.transToShuffleUnion shuffled on their columns at the
+    // parent's required positions: its output is hash distributed on the union columns at those positions, which
+    // is what the parent asked for. Each child is hashed on the same positions with the same function, so a row
+    // reaches the same instance whichever child it comes from.
+    private PhysicalPropertySet computeShuffleUnionAllOutputProperty(PhysicalSetOperation node,
+                                                                     ExpressionContext context) {
+        Optional<List<List<DistributionCol>>> shuffleColumns = unionAllShuffleColumns(node, requirements);
+        if (shuffleColumns.isEmpty()) {
+            return PhysicalPropertySet.EMPTY;
+        }
+        for (int i = 0; i < childrenOutputProperties.size(); ++i) {
+            DistributionSpec childSpec = childrenOutputProperties.get(i).getDistributionProperty().getSpec();
+            if (!(childSpec instanceof HashDistributionSpec)) {
+                return PhysicalPropertySet.EMPTY;
+            }
+            HashDistributionSpec childHashSpec = (HashDistributionSpec) childSpec;
+            if (childHashSpec.getHashDistributionDesc().isLocal() ||
+                    !sameColumnIds(childHashSpec.getShuffleColumns(), shuffleColumns.get().get(i))) {
+                return PhysicalPropertySet.EMPTY;
+            }
+        }
+        HashDistributionDesc requiredDesc =
+                ((HashDistributionSpec) requirements.getDistributionProperty().getSpec()).getHashDistributionDesc();
+        List<Integer> positions = unionAllRequiredPositions(node, requiredDesc).orElseThrow().positions;
+        List<Integer> columnIds = positions.stream()
+                .map(position -> node.getOutputColumnRefOp().get(position).getId())
+                .collect(Collectors.toList());
+        HashDistributionSpec outputSpec = DistributionSpec.createHashDistributionSpec(
+                new HashDistributionDesc(columnIds, requiredDesc.getSourceType()));
+        return new PhysicalPropertySet(DistributionProperty.createProperty(outputSpec));
     }
 
     @Override

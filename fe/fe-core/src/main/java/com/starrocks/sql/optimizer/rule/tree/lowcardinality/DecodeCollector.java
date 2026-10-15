@@ -804,8 +804,25 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         // A UNION ALL never hashes its rows itself, also not a colocated one, which only passes the bucket
         // distribution of its children through: its columns merge dicts the same way in both cases.
         if (setOp instanceof PhysicalUnionOperator && ((PhysicalUnionOperator) setOp).isUnionAll()) {
-            Preconditions.checkState(!(dist instanceof HashDistributionSpec) ||
-                    ((HashDistributionSpec) dist).getHashDistributionDesc().isLocal());
+            // A shuffled UNION ALL hashes each child in that child's own exchange, against the parent's other side
+            // (e.g. the other side of a shuffle join), which hashes plain strings. Keep its shuffle columns decoded.
+            Set<Integer> shufflePositions = Sets.newHashSet();
+            if (dist instanceof HashDistributionSpec &&
+                    !((HashDistributionSpec) dist).getHashDistributionDesc().isLocal()) {
+                for (int i = 0; i < optExpression.arity(); ++i) {
+                    DistributionSpec childSpec = optExpression.getRequiredProperties().get(i)
+                            .getDistributionProperty().getSpec();
+                    Preconditions.checkState(childSpec instanceof HashDistributionSpec);
+                    List<ColumnRefOperator> childColumns = setOp.getChildOutputColumns().get(i);
+                    for (DistributionCol col : ((HashDistributionSpec) childSpec).getShuffleColumns()) {
+                        for (int position = 0; position < childColumns.size(); ++position) {
+                            if (childColumns.get(position).getId() == col.getColId()) {
+                                shufflePositions.add(position);
+                            }
+                        }
+                    }
+                }
+            }
             DecodeInfo result = DecodeInfo.create();
             result.inputStringColumns.union(context.outputStringColumns);
             for (int i = 0; i < setOp.getOutputColumnRefOp().size(); ++i) {
@@ -813,6 +830,13 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
                 List<ColumnRefOperator> childColumns = setOp.getChildOutputColumns().stream()
                         .map(l -> l.get(finalI)).toList();
                 List<Integer> childColumnIds = childColumns.stream().map(ColumnRefOperator::getId).toList();
+                if (shufflePositions.contains(i)) {
+                    childColumns.forEach(disableRewriteStringColumns::union);
+                    disableRewriteStringColumns.union(setOp.getOutputColumnRefOp().get(i));
+                    childColumns.stream().filter(c -> context.outputStringColumns.contains(c))
+                            .forEach(result.decodeStringColumns::union);
+                    continue;
+                }
                 boolean isCandidate = childColumns.stream().allMatch(
                         c -> context.outputStringColumns.contains(c) || unionDictionaryManager.isSupportedConstant(c));
                 ColumnRefOperator outputColumn = setOp.getOutputColumnRefOp().get(i);
