@@ -42,6 +42,8 @@ import com.starrocks.thrift.TPlanNodeType;
 
 public class UnionNode extends SetOperationNode {
     private LocalExchangerType localExchangeType;
+    // a UNION ALL that keeps the colocated bucket distribution of its children
+    private boolean colocateUnionAll = false;
     public UnionNode(PlanNodeId id, TupleId tupleId) {
         super(id, tupleId, "UNION");
         // default is pass through, which means round robin
@@ -52,10 +54,22 @@ public class UnionNode extends SetOperationNode {
         this.localExchangeType = localExchangeType;
     }
 
+    public boolean isColocateUnionAll() {
+        return colocateUnionAll;
+    }
+
+    public void setColocateUnionAll() {
+        this.colocateUnionAll = true;
+        this.localExchangeType = LocalExchangerType.DIRECT;
+    }
+
     @Override
     protected void toThrift(TPlanNode msg) {
         toThrift(msg, TPlanNodeType.UNION_NODE);
         msg.union_node.setLocal_exchanger_type(localExchangeType.getThriftType());
+        if (colocateUnionAll) {
+            msg.union_node.setIs_colocate_union_all(true);
+        }
     }
 
     @Override

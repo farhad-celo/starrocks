@@ -198,6 +198,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String STREAMING_PREAGGREGATION_MODE = "streaming_preaggregation_mode";
     public static final String DISABLE_COLOCATE_JOIN = "disable_colocate_join";
     public static final String DISABLE_COLOCATE_SET = "disable_colocate_set";
+    public static final String ENABLE_COLOCATE_UNION_ALL = "enable_colocate_union_all";
     public static final String DISABLE_BUCKET_JOIN = "disable_bucket_join";
     public static final String PARALLEL_FRAGMENT_EXEC_INSTANCE_NUM = "parallel_fragment_exec_instance_num";
     public static final String MAX_PARALLEL_SCAN_INSTANCE_NUM = "max_parallel_scan_instance_num";
@@ -1292,6 +1293,11 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     @VariableMgr.VarAttr(name = DISABLE_COLOCATE_SET)
     private boolean disableColocateSet = false;
+
+    // Let a UNION ALL whose children are all bucket-distributed by one colocate group keep that distribution,
+    // so that a join or aggregation above it on the bucket columns can run colocated instead of shuffling.
+    @VariableMgr.VarAttr(name = ENABLE_COLOCATE_UNION_ALL)
+    private boolean enableColocateUnionAll = false;
     @VariableMgr.VarAttr(name = CBO_USE_CORRELATED_JOIN_ESTIMATE, flag = VariableMgr.INVISIBLE)
     private boolean useCorrelatedJoinEstimate = true;
 
@@ -3664,6 +3670,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setDisableColocateSet(boolean value) {
         disableColocateSet = value;
+    }
+
+    public boolean isEnableColocateUnionAll() {
+        return enableColocateUnionAll;
+    }
+
+    public void setEnableColocateUnionAll(boolean value) {
+        enableColocateUnionAll = value;
     }
 
     public int getParallelExecInstanceNum() {

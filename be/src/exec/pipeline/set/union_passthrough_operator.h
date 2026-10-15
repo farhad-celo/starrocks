@@ -93,7 +93,18 @@ public:
                                                           _dst_slots, _src_slots);
     }
 
+    // Fails the fragment at prepare, before any row flows, with this error.
+    void set_prepare_error(std::string error) { _prepare_error = std::move(error); }
+
+    Status prepare(RuntimeState* state) override {
+        if (!_prepare_error.empty()) {
+            return Status::InternalError(_prepare_error);
+        }
+        return OperatorFactory::prepare(state);
+    }
+
 private:
+    std::string _prepare_error;
     // It will be nullptr, if _pass_through_slot_maps of UnionNode is empty.
     UnionPassthroughOperator::SlotMap* _dst2src_slot_map;
 

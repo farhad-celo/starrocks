@@ -139,6 +139,7 @@ import com.starrocks.sql.common.UnsupportedException;
 import com.starrocks.sql.optimizer.JoinHelper;
 import com.starrocks.sql.optimizer.OptExpression;
 import com.starrocks.sql.optimizer.OptExpressionVisitor;
+import com.starrocks.sql.optimizer.PropertyDeriverBase;
 import com.starrocks.sql.optimizer.UKFKConstraintsCollector;
 import com.starrocks.sql.optimizer.Utils;
 import com.starrocks.sql.optimizer.base.ColumnRefFactory;
@@ -3325,9 +3326,7 @@ public class PlanFragmentBuilder {
                 List<List<Expr>> localPartitionByExprsList = Lists.newArrayList();
                 List<List<DistributionCol>> childOutputDistColsList = setOperation.getChildOutputColumns()
                         .stream()
-                        .map(childCols -> childCols.stream()
-                                .map(col -> new DistributionCol(col.getId(), true))
-                                .collect(Collectors.toList()))
+                        .map(PropertyDeriverBase::toDistributionCols)
                         .collect(Collectors.toList());
 
                 for (int i = 0; i < optExpr.getRequiredProperties().size(); ++i) {
@@ -3348,6 +3347,11 @@ public class PlanFragmentBuilder {
                     localPartitionByExprsList.add(childLocalPartitionExprs);
                 }
                 setOperationNode.setLocalPartitionByExprsList(localPartitionByExprsList);
+                if (setOperation instanceof PhysicalUnionOperator &&
+                        ((PhysicalUnionOperator) setOperation).isUnionAll()) {
+                    // keep each child's driver i on union driver i, so the buckets stay where the scheduler put them
+                    ((UnionNode) setOperationNode).setColocateUnionAll();
+                }
             }
 
             ExecGroup execGroup = execGroups.newExecGroup();

@@ -14,6 +14,8 @@
 
 #include "exec/union_node.h"
 
+#include <algorithm>
+
 #include "column/column_helper.h"
 #include "column/nullable_column.h"
 #include "exec/pipeline/limit_operator.h"
@@ -67,6 +69,9 @@ Status UnionNode::init(const TPlanNode& tnode, RuntimeState* state) {
             _local_partition_by_exprs.push_back(ctxs);
         }
     }
+
+    _is_colocate_union_all =
+            tnode.union_node.__isset.is_colocate_union_all && tnode.union_node.is_colocate_union_all;
 
     if (tnode.union_node.__isset.pass_through_slot_maps) {
         for (const auto& item : tnode.union_node.pass_through_slot_maps) {
@@ -363,7 +368,10 @@ pipeline::OpFactories UnionNode::decompose_to_pipeline(pipeline::PipelineBuilder
     // UnionPassthroughOperator is used for the passthrough sub-node.
     for (; i < _first_materialized_child_idx; i++) {
         auto child_ops = child(i)->decompose_to_pipeline(context);
-        if (!_local_partition_by_exprs.empty()) {
+        if (_is_colocate_union_all) {
+            // see the comment where the union output is marked below
+            child_ops = context->maybe_interpolate_grouped_exchange(_id, child_ops);
+        } else if (!_local_partition_by_exprs.empty()) {
             child_ops = context->maybe_interpolate_local_bucket_shuffle_exchange(
                     context->runtime_state(), _id, child_ops, _local_partition_by_exprs[i]);
         } else {
@@ -449,8 +457,42 @@ pipeline::OpFactories UnionNode::decompose_to_pipeline(pipeline::PipelineBuilder
         }
     }
 
+    // A colocated UNION ALL (the FE planned the parent, e.g. a colocate join, with no exchange on either side)
+    // feeds the rows of a child's driver i to union driver i through the DIRECT exchanger. A scan cannot be
+    // shuffled locally when its scan ranges are assigned per driver by bucket. The scheduler does that for all
+    // scans of the fragment or for none, and gives a scan pruned to other instances' buckets empty ranges per
+    // driver (LocalFragmentAssignmentStrategy), so the children agree:
+    // - none can be shuffled: union driver i holds exactly the buckets the scheduler gave driver i, as does the
+    //   parent's other side, so the union output is marked unshufflable and the parent keeps it as is;
+    // - all can be shuffled: the union output stays shufflable and the parent shuffles it locally by the same join
+    //   keys and hash it shuffles the other side with.
+    const auto num_shufflable = std::count_if(operators_list.begin(), operators_list.end(),
+                                              [context](const auto& ops) { return context->could_local_shuffle(ops); });
+    // If the children ever disagreed, the shufflable ones would not be aligned by bucket while the parent's other
+    // side may be, and neither marking of the output would give a correct join. Fail the query instead.
+    const bool children_disagree =
+            _is_colocate_union_all && num_shufflable != 0 && num_shufflable != operators_list.size();
+    DCHECK(!children_disagree) << "children of a colocated union all disagree on local shuffle";
+    if (children_disagree) {
+        for (auto& ops : operators_list) {
+            if (auto* passthrough = dynamic_cast<UnionPassthroughOperatorFactory*>(ops.back().get())) {
+                passthrough->set_prepare_error(
+                        "children of a colocated union all disagree on local shuffle; "
+                        "set enable_colocate_union_all = false");
+            }
+        }
+    }
+    const bool aligned_with_fragment = _is_colocate_union_all && num_shufflable == 0;
+    // Keep child driver i on union driver i only while the children are aligned by bucket. Otherwise the parent
+    // shuffles the union output locally anyway, so spread it round-robin like a normal union.
+    const auto pass_through_type = _is_colocate_union_all && !aligned_with_fragment
+                                           ? pipeline::LocalExchanger::PassThroughType::RANDOM
+                                           : _pass_through_type;
     auto final_operators =
-            context->maybe_gather_pipelines_to_one(runtime_state(), id(), operators_list, _pass_through_type);
+            context->maybe_gather_pipelines_to_one(runtime_state(), id(), operators_list, pass_through_type);
+    if (aligned_with_fragment) {
+        context->source_operator(final_operators)->set_could_local_shuffle(false);
+    }
 
     if (limit() != -1) {
         final_operators.emplace_back(

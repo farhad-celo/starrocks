@@ -883,6 +883,21 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         this.cacheParam = cacheParam;
     }
 
+    // Whether the fragment holds a UNION ALL that keeps the colocated bucket distribution of its children.
+    public boolean hasColocateUnionAll() {
+        return hasColocateUnionAll(planRoot);
+    }
+
+    private static boolean hasColocateUnionAll(PlanNode node) {
+        if (node instanceof ExchangeNode) {
+            return false;
+        }
+        if (node instanceof UnionNode && ((UnionNode) node).isColocateUnionAll()) {
+            return true;
+        }
+        return node.getChildren().stream().anyMatch(PlanFragment::hasColocateUnionAll);
+    }
+
     public Map<PlanNodeId, ScanNode> collectScanNodes() {
         Map<PlanNodeId, ScanNode> scanNodes = Maps.newHashMap();
         Queue<PlanNode> queue = Lists.newLinkedList();

@@ -21,6 +21,7 @@ import com.starrocks.analysis.JoinOperator;
 import com.starrocks.catalog.ColocateTableIndex;
 import com.starrocks.common.Pair;
 import com.starrocks.qe.ConnectContext;
+import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.optimizer.base.DistributionCol;
 import com.starrocks.sql.optimizer.base.DistributionProperty;
@@ -350,8 +351,39 @@ public class ChildOutputPropertyGuarantor extends PropertyDeriverBase<Void, Expr
         return visitOperator(node, context);
     }
 
+    // A UNION ALL keeps its children's distribution only if they all keep one colocated bucket distribution: each
+    // child is colocated with child 0 (the same check as a colocate join), and each bucket column is at one union
+    // position common to all children (unionAllBucketPositions). Then each bucket of the union holds exactly the
+    // rows of that bucket of every child.
+    private boolean canColocateUnionAll(PhysicalUnionOperator node) {
+        if (!childrenOutputProperties.stream().allMatch(p -> p.getDistributionProperty().isShuffle())) {
+            return false;
+        }
+        HashDistributionSpec firstHashDistSpec =
+                (HashDistributionSpec) childrenOutputProperties.get(0).getDistributionProperty().getSpec();
+        List<DistributionCol> firstColumns = toDistributionCols(node.getChildOutputColumns().get(0));
+        for (int i = 1; i < childrenOutputProperties.size(); ++i) {
+            HashDistributionSpec otherHashDistSpec =
+                    (HashDistributionSpec) childrenOutputProperties.get(i).getDistributionProperty().getSpec();
+            if (!canColocateSet(firstHashDistSpec, otherHashDistSpec, firstColumns,
+                    toDistributionCols(node.getChildOutputColumns().get(i)))) {
+                return false;
+            }
+        }
+        return unionAllBucketPositions(node, childrenOutputProperties).isPresent();
+    }
+
     public Void visitPhysicalSetOperation(PhysicalSetOperation node, ExpressionContext context) {
         if (node instanceof PhysicalUnionOperator && ((PhysicalUnionOperator) node).isUnionAll()) {
+            SessionVariable sessionVariable = this.context.getSessionVariable();
+            // Only the colocated option (computeColocateUnionAllRequiredProperties) can get LOCAL children here: a
+            // LOCAL distribution never satisfies the round-robin option's requirement.
+            if (sessionVariable.isEnableColocateUnionAll() && !sessionVariable.isDisableColocateSet() &&
+                    canColocateUnionAll((PhysicalUnionOperator) node)) {
+                return visitOperator(node, context);
+            }
+            // Also when the colocated option didn't work out: the round-robin exchanges replace the hash exchanges
+            // added for it, so this is the same plan as the round-robin option, which is costed before it.
             return transToRoundRobinUnion(node, context);
         }
 

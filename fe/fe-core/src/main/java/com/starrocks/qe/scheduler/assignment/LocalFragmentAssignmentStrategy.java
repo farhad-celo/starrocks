@@ -18,6 +18,7 @@ import com.google.common.collect.Sets;
 import com.starrocks.common.Config;
 import com.starrocks.common.StarRocksException;
 import com.starrocks.common.util.ListUtil;
+import com.starrocks.planner.OlapScanNode;
 import com.starrocks.planner.PlanFragment;
 import com.starrocks.planner.ScanNode;
 import com.starrocks.qe.BackendSelector;
@@ -202,6 +203,7 @@ public class LocalFragmentAssignmentStrategy implements FragmentAssignmentStrate
 
         boolean assignPerDriverSeq = usePipeline && workerIdToBucketSeqs.values().stream()
                 .allMatch(bucketSeqs -> enableAssignScanRangesPerDriverSeq(bucketSeqs, pipelineDop));
+        boolean padAllOlapScans = assignPerDriverSeq && fragment.hasColocateUnionAll();
 
         if (!assignPerDriverSeq) {
             // these optimize depend on assignPerDriverSeq.
@@ -271,6 +273,16 @@ public class LocalFragmentAssignmentStrategy implements FragmentAssignmentStrate
                         });
                     }
 
+                    // A scan pruned to buckets of other instances got no scan ranges above; give it empty ones per
+                    // driver too, so that all scans of the fragment are laid out per driver alike. Otherwise the BE
+                    // would treat it as locally shufflable unlike its siblings, e.g. in a colocated UNION ALL.
+                    if (padAllOlapScans) {
+                        execFragment.getScanNodes().stream()
+                                .filter(scanNode -> scanNode instanceof OlapScanNode)
+                                .map(scanNode -> scanNode.getId().asInt())
+                                .filter(scanId -> !replicatedScanIds.contains(scanId))
+                                .forEach(scanId -> instance.addScanRanges(scanId, 0, new ArrayList<>()));
+                    }
                     instance.paddingScanRanges();
                 }
             });

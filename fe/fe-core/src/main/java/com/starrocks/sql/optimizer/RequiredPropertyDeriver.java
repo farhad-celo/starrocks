@@ -17,6 +17,7 @@ package com.starrocks.sql.optimizer;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.starrocks.qe.ConnectContext;
+import com.starrocks.qe.SessionVariable;
 import com.starrocks.sql.optimizer.base.CTEProperty;
 import com.starrocks.sql.optimizer.base.ColumnRefFactory;
 import com.starrocks.sql.optimizer.base.ColumnRefSet;
@@ -64,10 +65,12 @@ import java.util.stream.IntStream;
 public class RequiredPropertyDeriver extends PropertyDeriverBase<Void, ExpressionContext> {
     private final ColumnRefFactory columnRefFactory;
     private final PhysicalPropertySet requirementsFromParent;
+    private final SessionVariable sessionVariable;
     private List<List<PhysicalPropertySet>> requiredProperties;
 
     public RequiredPropertyDeriver(TaskContext context) {
         this.requirementsFromParent = context.getRequiredProperty();
+        this.sessionVariable = context.getOptimizerContext().getSessionVariable();
         this.columnRefFactory = context.getOptimizerContext().getColumnRefFactory();
     }
 
@@ -330,6 +333,9 @@ public class RequiredPropertyDeriver extends PropertyDeriverBase<Void, Expressio
                     .map(PhysicalPropertySet::new)
                     .collect(Collectors.toList());
             requiredProperties.add(childProperty);
+            // or keep the children's colocated bucket distribution, see computeColocateUnionAllRequiredProperties
+            computeColocateUnionAllRequiredProperties((PhysicalUnionOperator) setOp, requirementsFromParent,
+                    sessionVariable, context.getGroupExpression()).ifPresent(requiredProperties::add);
             return;
         }
 

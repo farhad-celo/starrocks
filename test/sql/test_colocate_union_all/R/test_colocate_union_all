@@ -1,0 +1,111 @@
+-- name: test_colocate_union_all
+CREATE TABLE cua_f1 (shard int, a int, b int) DUPLICATE KEY(shard) DISTRIBUTED BY HASH(shard) BUCKETS 8 PROPERTIES ("replication_num" = "1", "colocate_with" = "cua_group");
+-- result:
+-- !result
+CREATE TABLE cua_f2 (shard int, a int, b int) DUPLICATE KEY(shard) DISTRIBUTED BY HASH(shard) BUCKETS 8 PROPERTIES ("replication_num" = "1", "colocate_with" = "cua_group");
+-- result:
+-- !result
+CREATE TABLE cua_f3 (shard int, a int, b int) DUPLICATE KEY(shard) DISTRIBUTED BY HASH(shard) BUCKETS 8 PROPERTIES ("replication_num" = "1", "colocate_with" = "cua_group");
+-- result:
+-- !result
+CREATE TABLE cua_m (shard int, k1 int, k2 int) UNIQUE KEY(shard, k1, k2) DISTRIBUTED BY HASH(shard) BUCKETS 8 PROPERTIES ("replication_num" = "1", "colocate_with" = "cua_group");
+-- result:
+-- !result
+insert into cua_f1 select g % 50, g % 7, g % 11 from table(generate_series(1, 20000)) t(g);
+-- result:
+-- !result
+insert into cua_f2 select g % 50, g % 5, g % 13 from table(generate_series(1, 20000)) t(g);
+-- result:
+-- !result
+insert into cua_f3 select g % 50, g % 3, g % 17 from table(generate_series(1, 20000)) t(g);
+-- result:
+-- !result
+insert into cua_m select g % 50, g % 7, g % 11 from table(generate_series(1, 3000)) t(g);
+-- result:
+-- !result
+CREATE TABLE cua_s1 (k varchar(20), v int) DUPLICATE KEY(k) DISTRIBUTED BY HASH(k) BUCKETS 8 PROPERTIES ("replication_num" = "1", "colocate_with" = "cua_str_group");
+-- result:
+-- !result
+CREATE TABLE cua_s2 (k varchar(20), v int) DUPLICATE KEY(k) DISTRIBUTED BY HASH(k) BUCKETS 8 PROPERTIES ("replication_num" = "1", "colocate_with" = "cua_str_group");
+-- result:
+-- !result
+CREATE TABLE cua_sm (k varchar(20), w int) DUPLICATE KEY(k) DISTRIBUTED BY HASH(k) BUCKETS 8 PROPERTIES ("replication_num" = "1", "colocate_with" = "cua_str_group");
+-- result:
+-- !result
+insert into cua_s1 select concat('key', g % 40), g from table(generate_series(1, 20000)) t(g);
+-- result:
+-- !result
+insert into cua_s2 select concat('key', g % 25), g from table(generate_series(1, 20000)) t(g);
+-- result:
+-- !result
+insert into cua_sm select concat('key', g % 30), g from table(generate_series(1, 300)) t(g);
+-- result:
+-- !result
+create table result (n bigint, v bigint) properties("replication_num"="1");
+-- result:
+-- !result
+insert into result with src as (select shard, a, b from cua_f1 union all select shard, a, b from cua_f2 where shard = 3 union all select shard, a + 1, b from cua_f3) select /*+SET_VAR(enable_colocate_union_all=false)*/ count(*), sum(murmur_hash3_32(src.shard, src.a, src.b)) from src left anti join [unreorder] cua_m on src.shard = cua_m.shard and src.a = cua_m.k1 and src.b = cua_m.k2;
+-- result:
+-- !result
+insert into result with src as (select shard, a, b from cua_f1 union all select shard, a, b from cua_f2 where shard = 3 union all select shard, a + 1, b from cua_f3) select /*+SET_VAR(enable_colocate_union_all=true)*/ count(*), sum(murmur_hash3_32(src.shard, src.a, src.b)) from src left anti join [unreorder] cua_m on src.shard = cua_m.shard and src.a = cua_m.k1 and src.b = cua_m.k2;
+-- result:
+-- !result
+select assert_true(count(1)=2 and count(distinct n, v)=1) from result;
+-- result:
+1
+-- !result
+truncate table result;
+-- result:
+-- !result
+insert into result with src as (select shard, a, b from cua_f1 union all select shard, a, b from cua_f2 where shard = 3 union all select shard, a + 1, b from cua_f3) select /*+SET_VAR(enable_colocate_union_all=false)*/ count(*), sum(murmur_hash3_32(src.shard, src.a, cua_m.k2)) from src join [unreorder] cua_m on src.shard = cua_m.shard and src.a = cua_m.k1;
+-- result:
+-- !result
+insert into result with src as (select shard, a, b from cua_f1 union all select shard, a, b from cua_f2 where shard = 3 union all select shard, a + 1, b from cua_f3) select /*+SET_VAR(enable_colocate_union_all=true)*/ count(*), sum(murmur_hash3_32(src.shard, src.a, cua_m.k2)) from src join [unreorder] cua_m on src.shard = cua_m.shard and src.a = cua_m.k1;
+-- result:
+-- !result
+select assert_true(count(1)=2 and count(distinct n, v)=1) from result;
+-- result:
+1
+-- !result
+truncate table result;
+-- result:
+-- !result
+insert into result select /*+SET_VAR(enable_colocate_union_all=false)*/ count(*), sum(murmur_hash3_32(x, c)) from (select x, count(*) c from (select shard x, shard y from cua_f1 union all select a, shard from cua_f2) t join [unreorder] cua_m on t.y = cua_m.shard group by x) r;
+-- result:
+-- !result
+insert into result select /*+SET_VAR(enable_colocate_union_all=true)*/ count(*), sum(murmur_hash3_32(x, c)) from (select x, count(*) c from (select shard x, shard y from cua_f1 union all select a, shard from cua_f2) t join [unreorder] cua_m on t.y = cua_m.shard group by x) r;
+-- result:
+-- !result
+select assert_true(count(1)=2 and count(distinct n, v)=1) from result;
+-- result:
+1
+-- !result
+truncate table result;
+-- result:
+-- !result
+insert into result select /*+SET_VAR(enable_colocate_union_all=false)*/ count(*), sum(murmur_hash3_32(t.k, t.v, cua_sm.w)) from (select k, v from cua_s1 union all select k, v from cua_s2) t join [unreorder] cua_sm on t.k = cua_sm.k;
+-- result:
+-- !result
+insert into result select /*+SET_VAR(enable_colocate_union_all=true)*/ count(*), sum(murmur_hash3_32(t.k, t.v, cua_sm.w)) from (select k, v from cua_s1 union all select k, v from cua_s2) t join [unreorder] cua_sm on t.k = cua_sm.k;
+-- result:
+-- !result
+select assert_true(count(1)=2 and count(distinct n, v)=1) from result;
+-- result:
+1
+-- !result
+truncate table result;
+-- result:
+-- !result
+insert into result select /*+SET_VAR(enable_colocate_union_all=false)*/ count(*), sum(murmur_hash3_32(k, c)) from (select k, count(*) c from (select k, v from cua_s1 union all select k, v from cua_s2) t group by k) r;
+-- result:
+-- !result
+insert into result select /*+SET_VAR(enable_colocate_union_all=true)*/ count(*), sum(murmur_hash3_32(k, c)) from (select k, count(*) c from (select k, v from cua_s1 union all select k, v from cua_s2) t group by k) r;
+-- result:
+-- !result
+select assert_true(count(1)=2 and count(distinct n, v)=1) from result;
+-- result:
+1
+-- !result
+truncate table result;
+-- result:
+-- !result

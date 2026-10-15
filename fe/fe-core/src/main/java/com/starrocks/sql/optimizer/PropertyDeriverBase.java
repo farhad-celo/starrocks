@@ -17,6 +17,10 @@ package com.starrocks.sql.optimizer;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.starrocks.catalog.ColocateTableIndex;
+import com.starrocks.qe.SessionVariable;
+import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.optimizer.base.DistributionCol;
 import com.starrocks.sql.optimizer.base.DistributionProperty;
 import com.starrocks.sql.optimizer.base.DistributionSpec;
@@ -25,12 +29,18 @@ import com.starrocks.sql.optimizer.base.HashDistributionSpec;
 import com.starrocks.sql.optimizer.base.PhysicalPropertySet;
 import com.starrocks.sql.optimizer.operator.Operator;
 import com.starrocks.sql.optimizer.operator.OperatorVisitor;
+import com.starrocks.sql.optimizer.operator.Projection;
+import com.starrocks.sql.optimizer.operator.logical.LogicalFilterOperator;
+import com.starrocks.sql.optimizer.operator.logical.LogicalOlapScanOperator;
+import com.starrocks.sql.optimizer.operator.logical.LogicalProjectOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalSetOperation;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalUnionOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
+import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import org.apache.commons.collections4.CollectionUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -74,6 +84,61 @@ public abstract class PropertyDeriverBase<R, C> extends OperatorVisitor<R, C> {
         }
     }
 
+    // The bucket positions of a UNION ALL whose children all keep a LOCAL distribution, shared by
+    // ChildOutputPropertyGuarantor (whether to keep the colocated plan) and OutputPropertyDeriver (the union's
+    // output distribution). Returns, for each bucket column k, the union positions holding the k-th bucket column
+    // in every child, or empty if a child isn't LOCAL, has another number of bucket columns than child 0, or some
+    // bucket column is at no common position. Each returned list is non-empty.
+    // Like for a colocate join, whether the children's tables share one stable colocate group is checked by
+    // ChildOutputPropertyGuarantor only: it replaces the children's distribution when they don't, so
+    // OutputPropertyDeriver never sees LOCAL children it hasn't vetted.
+    public static Optional<List<List<Integer>>> unionAllBucketPositions(PhysicalSetOperation node,
+                                                                       List<PhysicalPropertySet> childrenProperties) {
+        List<HashDistributionSpec> childSpecs = Lists.newArrayList();
+        for (PhysicalPropertySet property : childrenProperties) {
+            DistributionSpec spec = property.getDistributionProperty().getSpec();
+            if (!(spec instanceof HashDistributionSpec) ||
+                    !((HashDistributionSpec) spec).getHashDistributionDesc().isLocal()) {
+                return Optional.empty();
+            }
+            childSpecs.add((HashDistributionSpec) spec);
+        }
+        HashDistributionSpec first = childSpecs.get(0);
+        int numBucketCols = first.getShuffleColumns().size();
+        for (HashDistributionSpec other : childSpecs.subList(1, childSpecs.size())) {
+            if (other.getShuffleColumns().size() != numBucketCols) {
+                return Optional.empty();
+            }
+        }
+
+        List<List<DistributionCol>> childColumns = node.getChildOutputColumns().stream()
+                .map(PropertyDeriverBase::toDistributionCols).collect(Collectors.toList());
+        List<List<Integer>> positions = Lists.newArrayList();
+        for (int k = 0; k < numBucketCols; ++k) {
+            List<Integer> positionsOfK = Lists.newArrayList();
+            for (int position = 0; position < node.getOutputColumnRefOp().size(); ++position) {
+                boolean inEveryChild = true;
+                for (int i = 0; i < childSpecs.size() && inEveryChild; ++i) {
+                    HashDistributionSpec spec = childSpecs.get(i);
+                    inEveryChild = spec.getEquivDesc().isConnected(childColumns.get(i).get(position),
+                            spec.getShuffleColumns().get(k));
+                }
+                if (inEveryChild) {
+                    positionsOfK.add(position);
+                }
+            }
+            if (positionsOfK.isEmpty()) {
+                return Optional.empty();
+            }
+            positions.add(positionsOfK);
+        }
+        return Optional.of(positions);
+    }
+
+    public static List<DistributionCol> toDistributionCols(List<ColumnRefOperator> columns) {
+        return columns.stream().map(col -> new DistributionCol(col.getId(), true)).collect(Collectors.toList());
+    }
+
     public static List<PhysicalPropertySet> computeShuffleSetRequiredProperties(PhysicalSetOperation node) {
         Preconditions.checkArgument(
                 !((node instanceof PhysicalUnionOperator) && ((PhysicalUnionOperator) node).isUnionAll()));
@@ -93,6 +158,157 @@ public abstract class PropertyDeriverBase<R, C> extends OperatorVisitor<R, C> {
     }
 
 
+
+    // A UNION ALL normally asks its children for a round-robin distribution. When the parent requires a hash
+    // distribution, it may instead ask each child to be hash distributed on its own output columns at the same
+    // union positions: if all children then turn out to be bucket distributed by one colocate group, the union
+    // keeps that bucket distribution and the parent (e.g. a join with another table of the group) can run
+    // colocated. Required columns that are not a plain union output column (e.g. computed by the union's
+    // projection) are dropped; a hash distribution on a subset of the required columns still satisfies the
+    // requirement. Returns empty when the option does not apply.
+    protected static Optional<List<PhysicalPropertySet>> computeColocateUnionAllRequiredProperties(
+            PhysicalUnionOperator node, PhysicalPropertySet requiredFromParent, SessionVariable sessionVariable,
+            GroupExpression groupExpression) {
+        if (!sessionVariable.isEnableColocateUnionAll() || sessionVariable.isDisableColocateSet() ||
+                !node.isUnionAll() || node.hasLimit()) {
+            return Optional.empty();
+        }
+        DistributionSpec requiredSpec = requiredFromParent.getDistributionProperty().getSpec();
+        if (!(requiredSpec instanceof HashDistributionSpec)) {
+            return Optional.empty();
+        }
+        HashDistributionDesc requiredDesc = ((HashDistributionSpec) requiredSpec).getHashDistributionDesc();
+        if (!requiredDesc.isShuffle()) {
+            return Optional.empty();
+        }
+
+        // column id seen by the parent -> position in the union output
+        List<ColumnRefOperator> outputColumns = node.getOutputColumnRefOp();
+        Map<Integer, Integer> outputIdToPosition = Maps.newHashMap();
+        for (int i = 0; i < outputColumns.size(); ++i) {
+            outputIdToPosition.put(outputColumns.get(i).getId(), i);
+        }
+        Map<Integer, Integer> visibleIdToPosition = Maps.newHashMap();
+        Projection projection = node.getProjection();
+        if (projection == null) {
+            visibleIdToPosition.putAll(outputIdToPosition);
+        } else {
+            for (Map.Entry<ColumnRefOperator, ScalarOperator> entry : projection.getColumnRefMap().entrySet()) {
+                if (entry.getValue() instanceof ColumnRefOperator) {
+                    Integer position = outputIdToPosition.get(((ColumnRefOperator) entry.getValue()).getId());
+                    if (position != null) {
+                        visibleIdToPosition.put(entry.getKey().getId(), position);
+                    }
+                }
+            }
+        }
+
+        List<DistributionCol> requiredCols = Lists.newArrayList();
+        List<Integer> positions = Lists.newArrayList();
+        for (DistributionCol col : requiredDesc.getDistributionCols()) {
+            Integer position = visibleIdToPosition.get(col.getColId());
+            if (position != null && !positions.contains(position)) {
+                positions.add(position);
+                requiredCols.add(col);
+            }
+        }
+        if (positions.isEmpty() || !childrenAreColocateScansBucketedOn(node, groupExpression, positions)) {
+            return Optional.empty();
+        }
+
+        List<PhysicalPropertySet> requiredProperties = Lists.newArrayList();
+        for (List<ColumnRefOperator> childOutputColumns : node.getChildOutputColumns()) {
+            List<DistributionCol> childCols = Lists.newArrayList();
+            for (int i = 0; i < positions.size(); ++i) {
+                childCols.add(requiredCols.get(i).updateColId(childOutputColumns.get(positions.get(i)).getId()));
+            }
+            HashDistributionSpec childSpec = DistributionSpec.createHashDistributionSpec(
+                    new HashDistributionDesc(childCols, requiredDesc.getSourceType()));
+            requiredProperties.add(new PhysicalPropertySet(DistributionProperty.createProperty(childSpec)));
+        }
+        return Optional.of(requiredProperties);
+    }
+
+    // Cheap pre-check so that a UNION ALL doesn't optimize its children twice for nothing: every child must read
+    // one table of a single stable colocate group, through filters and projections only, and have all its bucket
+    // columns at union positions the parent asks for. Only then can the children keep one colocated distribution.
+    private static boolean childrenAreColocateScansBucketedOn(PhysicalUnionOperator node,
+                                                              GroupExpression groupExpression,
+                                                              List<Integer> positions) {
+        ColocateTableIndex colocateIndex = GlobalStateMgr.getCurrentState().getColocateTableIndex();
+        ColocateTableIndex.GroupId groupId = null;
+        for (int i = 0; i < groupExpression.arity(); ++i) {
+            Map<Integer, Integer> columnMapping = Maps.newHashMap();
+            List<ColumnRefOperator> childOutputColumns = node.getChildOutputColumns().get(i);
+            for (int position : positions) {
+                int colId = childOutputColumns.get(position).getId();
+                columnMapping.put(colId, colId);
+            }
+            LogicalOlapScanOperator scan = findColocateScan(groupExpression.inputAt(i), columnMapping);
+            if (scan == null || !(scan.getDistributionSpec() instanceof HashDistributionSpec)) {
+                return false;
+            }
+            ColocateTableIndex.GroupId childGroupId = colocateIndex.getGroup(scan.getTable().getId());
+            if (childGroupId == null || colocateIndex.isGroupUnstable(childGroupId) ||
+                    (groupId != null && !groupId.equals(childGroupId))) {
+                return false;
+            }
+            groupId = childGroupId;
+            // columnMapping now maps scan column ids to the child output column they reach
+            for (DistributionCol bucketCol : ((HashDistributionSpec) scan.getDistributionSpec()).getShuffleColumns()) {
+                if (!columnMapping.containsKey(bucketCol.getColId())) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // Walks down filters and projections to a colocate olap scan, rewriting columnMapping (keyed by the column id
+    // seen at the current level) to be keyed by the scan's column ids. Columns computed on the way are dropped.
+    // In each group it follows one logical expression: the scan if the group has one, else the first. That keeps
+    // the walk linear in the depth, at the price of missing a plan that only another expression would allow.
+    private static LogicalOlapScanOperator findColocateScan(Group group, Map<Integer, Integer> columnMapping) {
+        GroupExpression expression = group.getLogicalExpressions().stream()
+                .filter(e -> e.getOp() instanceof LogicalOlapScanOperator)
+                .findFirst()
+                .orElse(group.getFirstLogicalExpression());
+        return findColocateScan(expression, columnMapping);
+    }
+
+    private static LogicalOlapScanOperator findColocateScan(GroupExpression expression,
+                                                            Map<Integer, Integer> columnMapping) {
+        Operator op = expression.getOp();
+        if (op.getProjection() != null) {
+            remapThroughProjection(op.getProjection().getColumnRefMap(), columnMapping);
+        }
+        if (op instanceof LogicalOlapScanOperator) {
+            ColocateTableIndex colocateIndex = GlobalStateMgr.getCurrentState().getColocateTableIndex();
+            LogicalOlapScanOperator scan = (LogicalOlapScanOperator) op;
+            return colocateIndex.isColocateTable(scan.getTable().getId()) ? scan : null;
+        }
+        if (op instanceof LogicalProjectOperator) {
+            remapThroughProjection(((LogicalProjectOperator) op).getColumnRefMap(), columnMapping);
+            return findColocateScan(expression.inputAt(0), columnMapping);
+        }
+        if (op instanceof LogicalFilterOperator) {
+            return findColocateScan(expression.inputAt(0), columnMapping);
+        }
+        return null;
+    }
+
+    private static void remapThroughProjection(Map<ColumnRefOperator, ScalarOperator> projection,
+                                               Map<Integer, Integer> columnMapping) {
+        Map<Integer, Integer> remapped = Maps.newHashMap();
+        for (Map.Entry<ColumnRefOperator, ScalarOperator> entry : projection.entrySet()) {
+            Integer outputColId = columnMapping.get(entry.getKey().getId());
+            if (outputColId != null && entry.getValue() instanceof ColumnRefOperator) {
+                remapped.put(((ColumnRefOperator) entry.getValue()).getId(), outputColId);
+            }
+        }
+        columnMapping.clear();
+        columnMapping.putAll(remapped);
+    }
 
     protected static Optional<HashDistributionDesc> getShuffleJoinHashDistributionDesc(
             PhysicalPropertySet requiredPropertySet) {

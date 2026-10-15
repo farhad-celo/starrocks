@@ -801,8 +801,11 @@ public class DecodeCollector extends OptExpressionVisitor<DecodeInfo, DecodeInfo
         }
         PhysicalSetOperation setOp = optExpression.getOp().cast();
         DistributionSpec dist = optExpression.getRequiredProperties().get(0).getDistributionProperty().getSpec();
+        // A UNION ALL never hashes its rows itself, also not a colocated one, which only passes the bucket
+        // distribution of its children through: its columns merge dicts the same way in both cases.
         if (setOp instanceof PhysicalUnionOperator && ((PhysicalUnionOperator) setOp).isUnionAll()) {
-            Preconditions.checkState(!(dist instanceof HashDistributionSpec));
+            Preconditions.checkState(!(dist instanceof HashDistributionSpec) ||
+                    ((HashDistributionSpec) dist).getHashDistributionDesc().isLocal());
             DecodeInfo result = DecodeInfo.create();
             result.inputStringColumns.union(context.outputStringColumns);
             for (int i = 0; i < setOp.getOutputColumnRefOp().size(); ++i) {

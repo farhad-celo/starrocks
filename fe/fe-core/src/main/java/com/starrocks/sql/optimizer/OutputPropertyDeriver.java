@@ -244,24 +244,29 @@ public class OutputPropertyDeriver extends PropertyDeriverBase<PhysicalPropertyS
         HashDistributionDesc inputHashDistDesc = inputHashDistSpec.getHashDistributionDesc();
 
         if (inputHashDistDesc.isLocal()) {
-            List<DistributionCol> inputColumns = node.getChildOutputColumns().get(0)
-                    .stream()
-                    .map(col -> new DistributionCol(col.getId(), true))
-                    .collect(Collectors.toList());
-
-            List<DistributionCol> outputColumns = node.getOutputColumnRefOp()
-                    .stream()
-                    .map(col -> new DistributionCol(col.getId(), true))
-                    .collect(Collectors.toList());
+            List<DistributionCol> inputColumns = toDistributionCols(node.getChildOutputColumns().get(0));
+            List<DistributionCol> outputColumns = toDistributionCols(node.getOutputColumnRefOp());
 
             List<List<DistributionCol>> outputShuffleColumns = Lists.newArrayList();
-            for (int i = 0; i < inputHashDistDesc.getDistributionCols().size(); ++i) {
-                DistributionCol inputCol = inputHashDistDesc.getDistributionCols().get(i);
-                List<DistributionCol> outputShuffleCols = IntStream.range(0, inputColumns.size())
-                        .filter(k -> inputHashDistSpec.getEquivDesc().isConnected(inputCol, inputColumns.get(k)))
-                        .mapToObj(outputColumns::get)
-                        .collect(Collectors.toList());
-                outputShuffleColumns.add(outputShuffleCols);
+            if (node instanceof PhysicalUnionOperator && ((PhysicalUnionOperator) node).isUnionAll()) {
+                // The rows of a union come from every child, so an output column carries the bucket distribution
+                // only if it does so in every child, not just in the first one.
+                Optional<List<List<Integer>>> bucketPositions =
+                        unionAllBucketPositions(node, childrenOutputProperties);
+                if (bucketPositions.isEmpty()) {
+                    return visitOperator(node, context);
+                }
+                bucketPositions.get().forEach(positions -> outputShuffleColumns.add(
+                        positions.stream().map(outputColumns::get).collect(Collectors.toList())));
+            } else {
+                for (int i = 0; i < inputHashDistDesc.getDistributionCols().size(); ++i) {
+                    DistributionCol inputCol = inputHashDistDesc.getDistributionCols().get(i);
+                    List<DistributionCol> outputShuffleCols = IntStream.range(0, inputColumns.size())
+                            .filter(k -> inputHashDistSpec.getEquivDesc().isConnected(inputCol, inputColumns.get(k)))
+                            .mapToObj(outputColumns::get)
+                            .collect(Collectors.toList());
+                    outputShuffleColumns.add(outputShuffleCols);
+                }
             }
             Preconditions.checkArgument(outputShuffleColumns.stream().allMatch(cols -> cols.size() > 0));
             List<Integer> columnIds = outputShuffleColumns.stream()

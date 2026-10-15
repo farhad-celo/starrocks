@@ -1092,6 +1092,8 @@ struct TUnionNode {
     21: optional TLocalExchangerType local_exchanger_type
 
     22: optional list<list<Exprs.TExpr>> local_partition_by_exprs
+    // UNION ALL that keeps the colocated bucket distribution of its children
+    23: optional bool is_colocate_union_all
 }
 
 // Raw values node for efficient serialization of large constant lists
