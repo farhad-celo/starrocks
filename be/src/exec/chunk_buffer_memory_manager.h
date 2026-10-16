@@ -38,47 +38,53 @@ public:
         if (res < _max_memory_usage) {
             _max_memory_usage = res;
         }
-        _adaptive = config::enable_local_exchange_adaptive_buffer && config::local_exchange_buffer_initial_mem_limit_per_driver > 0;
-        _grown_limit_per_driver = _adaptive ? config::local_exchange_buffer_initial_mem_limit_per_driver : 0;
+        // Snapshot the configs, so that changing them doesn't shift the limit of running queries.
+        const int64_t initial = config::local_exchange_buffer_initial_mem_limit_per_driver;
+        _adaptive = config::enable_local_exchange_adaptive_buffer && initial > 0;
+        _min_chunks = std::max<int64_t>(1, config::local_exchange_buffer_min_chunks_per_driver);
+        _growth_factor = std::max(1.5, config::local_exchange_buffer_growth_factor);
+        _limit_per_driver = _adaptive ? std::min<size_t>(initial, _max_memory_usage_per_driver) : 0;
     }
 
-    // The sink reports the size of the chunks it pushes, so that the buffer limit can be no smaller than a few chunks.
-    void observe_chunk_memory_usage(size_t bytes) {
+    // The sink reports the size of the chunks it pushes, so that the buffer limit is never smaller than a few chunks.
+    // Returns true if the limit was raised.
+    bool observe_chunk_memory_usage(size_t bytes) {
         if (!_adaptive || bytes == 0) {
-            return;
+            return false;
         }
         size_t prev = _avg_chunk_memory_usage.load(std::memory_order_relaxed);
         // Decayed average rather than max, so that a few sparse chunks don't inflate the floor.
         // Racy read-modify-write is fine: it is only a heuristic.
-        _avg_chunk_memory_usage.store(prev == 0 ? bytes : prev - prev / 8 + bytes / 8, std::memory_order_relaxed);
+        size_t avg = prev == 0 ? bytes : prev - prev / 8 + bytes / 8;
+        _avg_chunk_memory_usage.store(avg, std::memory_order_relaxed);
+        return _raise_limit(_min_chunks * avg);
     }
 
-    // The per-driver limit currently in effect.
+    // The per-driver limit currently in effect. It never decreases, except by entering the release memory mode.
     size_t get_current_limit_per_driver() const {
         if (!_adaptive) {
             return _max_memory_usage_per_driver;
         }
-        size_t chunk_floor = config::local_exchange_buffer_min_chunks_per_driver * _avg_chunk_memory_usage.load();
-        return std::min(_max_memory_usage_per_driver, std::max<size_t>(_grown_limit_per_driver, chunk_floor));
+        if (_release_mode.load()) {
+            return _max_memory_usage / std::max<size_t>(1, _max_input_dop);
+        }
+        return _limit_per_driver.load();
     }
 
     bool can_grow() const {
-        return _adaptive && !_release_mode.load() && get_current_limit_per_driver() < _max_memory_usage_per_driver;
+        return _adaptive && !_release_mode.load() && _limit_per_driver.load() < _max_memory_usage_per_driver;
     }
 
-    // Raise the per-driver limit by growth factor. Returns true if the limit changed.
+    // Raise the per-driver limit by the growth factor. Returns true if this call raised the limit.
     bool try_grow() {
         if (!can_grow()) {
             return false;
         }
-        size_t cur = get_current_limit_per_driver();
-        size_t next = std::max<size_t>(cur + 1, static_cast<size_t>(cur * config::local_exchange_buffer_growth_factor));
-        next = std::min(next, _max_memory_usage_per_driver);
-        size_t prev = _grown_limit_per_driver.load();
-        while (prev < next && !_grown_limit_per_driver.compare_exchange_weak(prev, next)) {
+        bool raised = _raise_limit(static_cast<size_t>(_limit_per_driver.load() * _growth_factor));
+        if (raised) {
+            _grow_count++;
         }
-        _grow_count++;
-        return true;
+        return raised;
     }
 
     size_t get_grow_count() const { return _grow_count; }
@@ -87,7 +93,8 @@ public:
         bool prev_full = is_full();
         size_t prev_memusage = _memory_usage.fetch_add(memory_usage);
         size_t prev_num_rows = _buffered_num_rows.fetch_add(num_rows);
-        bool is_full = prev_memusage + memory_usage >= max_memory_usage() || prev_num_rows + num_rows > _max_buffered_rows;
+        bool is_full =
+                prev_memusage + memory_usage >= max_memory_usage() || prev_num_rows + num_rows > _max_buffered_rows;
         bool expect = false;
         bool full_changed = prev_full != is_full;
         if (!full_changed) {
@@ -101,6 +108,9 @@ public:
     int64_t get_memory_usage() const { return _memory_usage; }
 
     bool is_full() const { return _memory_usage >= max_memory_usage() || _buffered_num_rows > _max_buffered_rows; }
+
+    // Full because of the memory limit, as opposed to the buffered rows limit.
+    bool is_memory_full() const { return _memory_usage >= max_memory_usage(); }
 
     bool is_half_full() const { return _memory_usage * 2 >= max_memory_usage(); }
 
@@ -137,6 +147,18 @@ public:
     }
 
 private:
+    // Raise the limit to `target` (clamped to the maximum). Returns true if the limit was raised by this call.
+    bool _raise_limit(size_t target) {
+        target = std::min(target, _max_memory_usage_per_driver);
+        size_t prev = _limit_per_driver.load();
+        while (prev < target) {
+            if (_limit_per_driver.compare_exchange_weak(prev, target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     std::atomic<size_t> _max_memory_usage{128UL * 1024 * 1024 * 1024}; // 128GB
     size_t _max_memory_usage_per_driver = 128 * 1024 * 1024UL;         // 128MB
     size_t _max_buffered_rows{};
@@ -147,7 +169,10 @@ private:
 
     // Adaptive limit, see local_exchange_buffer_initial_mem_limit_per_driver.
     bool _adaptive = false;
-    std::atomic<size_t> _grown_limit_per_driver{0};
+    int64_t _min_chunks = 1;
+    double _growth_factor = 2.0;
+    // Only ever raised.
+    std::atomic<size_t> _limit_per_driver{0};
     std::atomic<size_t> _avg_chunk_memory_usage{0};
     std::atomic<size_t> _grow_count{0};
     // Sticky: once set, the limit is pinned and never grows.
