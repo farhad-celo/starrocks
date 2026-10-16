@@ -1569,6 +1569,14 @@ CONF_Int64(rocksdb_max_write_buffer_memory_bytes, "1073741824");
 
 // limit local exchange buffer's memory size per driver
 CONF_Int64(local_exchange_buffer_mem_limit_per_driver, "134217728"); // 128MB
+// Adaptive local exchange buffer. When enabled, the per-driver limit starts at
+// max(local_exchange_buffer_initial_mem_limit_per_driver, local_exchange_buffer_min_chunks_per_driver * observed chunk size)
+// and is multiplied by local_exchange_buffer_growth_factor whenever the buffer is full while a consumer is starved,
+// up to local_exchange_buffer_mem_limit_per_driver. When disabled, the limit is always the maximum.
+CONF_mBool(enable_local_exchange_adaptive_buffer, "true");
+CONF_mInt64(local_exchange_buffer_initial_mem_limit_per_driver, "1048576"); // 1MB
+CONF_mInt64(local_exchange_buffer_min_chunks_per_driver, "2");
+CONF_mDouble(local_exchange_buffer_growth_factor, "2.0");
 // limit local exchange buffer size by dop * local_exchange_buffer_mem_limit_per_driver for union operators.
 CONF_mBool(local_exchange_buffer_mem_limit_by_consumer_dop, "true");
 // only used for test. default: 128M

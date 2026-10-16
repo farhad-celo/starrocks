@@ -155,6 +155,15 @@ public:
 
     bool need_input() const;
 
+    // Called by the sink after pushing a chunk. If the buffer is full while some source is starved, the buffer limit
+    // is the bottleneck, so grow it and wake up the blocked sinks.
+    void maybe_grow_buffer();
+
+    void observe_chunk(const ChunkPtr& chunk) { _memory_manager->observe_chunk_memory_usage(chunk->memory_usage()); }
+
+    size_t get_current_limit_per_driver() const { return _memory_manager->get_current_limit_per_driver(); }
+    size_t get_buffer_grow_count() const { return _memory_manager->get_grow_count(); }
+
     virtual void incr_sinker() { _sink_number++; }
     int32_t decr_sinker() { return _sink_number--; }
 

@@ -38,14 +38,56 @@ public:
         if (res < _max_memory_usage) {
             _max_memory_usage = res;
         }
+        _adaptive = config::enable_local_exchange_adaptive_buffer && config::local_exchange_buffer_initial_mem_limit_per_driver > 0;
+        _grown_limit_per_driver = _adaptive ? config::local_exchange_buffer_initial_mem_limit_per_driver : 0;
     }
+
+    // The sink reports the size of the chunks it pushes, so that the buffer limit can be no smaller than a few chunks.
+    void observe_chunk_memory_usage(size_t bytes) {
+        if (!_adaptive || bytes == 0) {
+            return;
+        }
+        size_t prev = _avg_chunk_memory_usage.load(std::memory_order_relaxed);
+        // Decayed average rather than max, so that a few sparse chunks don't inflate the floor.
+        // Racy read-modify-write is fine: it is only a heuristic.
+        _avg_chunk_memory_usage.store(prev == 0 ? bytes : prev - prev / 8 + bytes / 8, std::memory_order_relaxed);
+    }
+
+    // The per-driver limit currently in effect.
+    size_t get_current_limit_per_driver() const {
+        if (!_adaptive) {
+            return _max_memory_usage_per_driver;
+        }
+        size_t chunk_floor = config::local_exchange_buffer_min_chunks_per_driver * _avg_chunk_memory_usage.load();
+        return std::min(_max_memory_usage_per_driver, std::max<size_t>(_grown_limit_per_driver, chunk_floor));
+    }
+
+    bool can_grow() const {
+        return _adaptive && !_release_mode.load() && get_current_limit_per_driver() < _max_memory_usage_per_driver;
+    }
+
+    // Raise the per-driver limit by growth factor. Returns true if the limit changed.
+    bool try_grow() {
+        if (!can_grow()) {
+            return false;
+        }
+        size_t cur = get_current_limit_per_driver();
+        size_t next = std::max<size_t>(cur + 1, static_cast<size_t>(cur * config::local_exchange_buffer_growth_factor));
+        next = std::min(next, _max_memory_usage_per_driver);
+        size_t prev = _grown_limit_per_driver.load();
+        while (prev < next && !_grown_limit_per_driver.compare_exchange_weak(prev, next)) {
+        }
+        _grow_count++;
+        return true;
+    }
+
+    size_t get_grow_count() const { return _grow_count; }
 
     void update_memory_usage(int64_t memory_usage, int64_t num_rows) {
         bool prev_full = is_full();
         size_t prev_memusage = _memory_usage.fetch_add(memory_usage);
         size_t prev_num_rows = _buffered_num_rows.fetch_add(num_rows);
-        bool is_full =
-                prev_memusage + memory_usage >= _max_memory_usage || prev_num_rows + num_rows > _max_buffered_rows;
+        bool is_full = prev_memusage + memory_usage >= max_memory_usage() || prev_num_rows + num_rows > _max_buffered_rows;
         bool expect = false;
         bool full_changed = prev_full != is_full;
         if (!full_changed) {
@@ -58,15 +100,27 @@ public:
 
     int64_t get_memory_usage() const { return _memory_usage; }
 
-    bool is_full() const { return _memory_usage >= _max_memory_usage || _buffered_num_rows > _max_buffered_rows; }
+    bool is_full() const { return _memory_usage >= max_memory_usage() || _buffered_num_rows > _max_buffered_rows; }
 
-    bool is_half_full() const { return _memory_usage * 2 >= _max_memory_usage; }
+    bool is_half_full() const { return _memory_usage * 2 >= max_memory_usage(); }
 
     size_t get_max_input_dop() const { return _max_input_dop; }
 
+    // Enters the release memory mode: the total limit is pinned to the given value and never grows again.
     void update_max_memory_usage(size_t max_memory_usage) {
         DCHECK(max_memory_usage > 0);
         _max_memory_usage = max_memory_usage;
+        _release_mode = true;
+    }
+
+    bool in_release_mode() const { return _release_mode; }
+
+    // The total limit currently in effect.
+    size_t max_memory_usage() const {
+        if (!_adaptive || _release_mode.load()) {
+            return _max_memory_usage;
+        }
+        return std::min<size_t>(_max_memory_usage, _max_input_dop * get_current_limit_per_driver());
     }
 
     void clear() {
@@ -90,5 +144,13 @@ private:
     std::atomic<int64_t> _buffered_num_rows{};
     size_t _max_input_dop;
     std::atomic<bool> _full_events_changed{};
+
+    // Adaptive limit, see local_exchange_buffer_initial_mem_limit_per_driver.
+    bool _adaptive = false;
+    std::atomic<size_t> _grown_limit_per_driver{0};
+    std::atomic<size_t> _avg_chunk_memory_usage{0};
+    std::atomic<size_t> _grow_count{0};
+    // Sticky: once set, the limit is pinned and never grows.
+    std::atomic<bool> _release_mode{false};
 };
 } // namespace starrocks::pipeline

@@ -78,6 +78,7 @@ set(EXEC_FILES
         ./exec/pipeline/nljoin_probe_operator_test.cpp
         ./exec/pipeline/analytic_node_pipeline_test.cpp
         ./exec/pipeline/ordered_partition_exchanger_test.cpp
+        ./exec/pipeline/local_exchange_adaptive_buffer_test.cpp
         ./exec/pipeline/mem_limited_chunk_queue_test.cpp
         ./exec/pipeline/exec_group_test.cpp
         ./exec/pipeline/scan/physical_split_morsel_queue_test.cpp
