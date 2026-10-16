@@ -404,6 +404,20 @@ bool LocalExchanger::need_input() const {
     return !_memory_manager->is_full() && !is_all_sources_finished();
 }
 
+void LocalExchanger::maybe_grow_buffer() {
+    if (!_memory_manager->is_full() || !_memory_manager->can_grow()) {
+        return;
+    }
+    for (auto* source : _source->get_sources()) {
+        if (source->is_starved()) {
+            if (_memory_manager->try_grow()) {
+                _sink_observable.notify_sink_observers();
+            }
+            return;
+        }
+    }
+}
+
 void RandomPassthroughExchanger::incr_sinker() {
     LocalExchanger::incr_sinker();
     _random_partitioners.emplace_back(std::make_unique<RandomPartitioner>(_source));

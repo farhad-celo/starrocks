@@ -91,7 +91,15 @@ bool LocalExchangeSourceOperator::is_finished() const {
 
 bool LocalExchangeSourceOperator::has_output() const {
     std::lock_guard<std::mutex> l(_chunk_lock);
+    return _has_output_unlocked();
+}
 
+bool LocalExchangeSourceOperator::is_starved() const {
+    std::lock_guard<std::mutex> l(_chunk_lock);
+    return !_is_finished && !_has_output_unlocked();
+}
+
+bool LocalExchangeSourceOperator::_has_output_unlocked() const {
     return !_full_chunk_queue.empty() || _partition_rows_num >= _factory->runtime_state()->chunk_size() ||
            _key_partition_max_rows() > 0 || ((_is_finished || _local_buffer_almost_full()) && _partition_rows_num > 0);
 }
@@ -142,6 +150,7 @@ const size_t min_local_memory_limit = 1LL * 1024 * 1024;
 void LocalExchangeSourceOperator::enter_release_memory_mode() {
     // limit the memory limit to a very small value so that the upstream will not write new data until all the data has been pushed to the downstream operators
     _local_memory_limit = min_local_memory_limit;
+    _release_mode = true;
     size_t max_memory_usage = min_local_memory_limit * _memory_manager->get_max_input_dop();
     _memory_manager->update_max_memory_usage(max_memory_usage);
 }
