@@ -31,6 +31,7 @@ import com.starrocks.sql.optimizer.base.ColumnRefSet;
 import com.starrocks.sql.optimizer.base.DistributionSpec;
 import com.starrocks.sql.optimizer.base.EmptyDistributionProperty;
 import com.starrocks.sql.optimizer.base.EmptySortProperty;
+import com.starrocks.sql.optimizer.base.HashDistributionSpec;
 import com.starrocks.sql.optimizer.base.PhysicalPropertySet;
 import com.starrocks.sql.optimizer.cost.CostModel;
 import com.starrocks.sql.optimizer.operator.OperatorType;
@@ -39,6 +40,7 @@ import com.starrocks.sql.optimizer.operator.physical.PhysicalDistributionOperato
 import com.starrocks.sql.optimizer.operator.physical.PhysicalHashAggregateOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalJoinOperator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalNoCTEOperator;
+import com.starrocks.sql.optimizer.operator.physical.PhysicalUnionOperator;
 import com.starrocks.sql.optimizer.operator.scalar.BinaryPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.statistics.ColumnStatistic;
@@ -184,6 +186,10 @@ public class EnforceAndCostTask extends OptimizerTask implements Cloneable {
                     break;
                 }
 
+                if (isShuffleUnionProbeOfBroadcastableJoin(childRequiredProperty, childBestExpr, childOutputProperty)) {
+                    break;
+                }
+
                 curTotalCost += childBestExpr.getCost(childRequiredProperty);
                 if (curTotalCost > context.getUpperBoundCost()) {
                     recordLowerBoundCost(curTotalCost);
@@ -325,6 +331,40 @@ public class EnforceAndCostTask extends OptimizerTask implements Cloneable {
             return false;
         }
         return true;
+    }
+
+    // A shuffled UNION ALL (enable_shuffle_union_all) as the probe side makes a hash join's shuffle option look about
+    // as cheap to feed as its broadcast option: both send every probe row once, round-robin into the union or hashed
+    // straight to the join, and the cost model charges both exchanges alike. Only the build side then decides, and
+    // broadcasting it is always costed higher on memory, even when it is small and broadcast is much cheaper to run.
+    // So when the build side has at most broadcast_row_limit rows, which the broadcast rule of thumb always allows
+    // to broadcast, skip this shuffle option, leaving the decision to the broadcast option. A bigger build side keeps
+    // both options, as for any join, so broadcast is never forced on one too big for every BE's memory.
+    private boolean isShuffleUnionProbeOfBroadcastableJoin(PhysicalPropertySet probeRequiredProperty,
+                                                           GroupExpression probeBestExpr,
+                                                           PhysicalPropertySet probeOutputProperty) {
+        if (curChildIndex != 0 || !OperatorType.PHYSICAL_HASH_JOIN.equals(groupExpression.getOp().getOpType()) ||
+                !probeRequiredProperty.getDistributionProperty().isShuffle()) {
+            return false;
+        }
+        if (!(probeBestExpr.getOp() instanceof PhysicalUnionOperator) ||
+                !((PhysicalUnionOperator) probeBestExpr.getOp()).isUnionAll() ||
+                !probeOutputProperty.getDistributionProperty().isShuffle() ||
+                ((HashDistributionSpec) probeOutputProperty.getDistributionProperty().getSpec())
+                        .getHashDistributionDesc().isLocal()) {
+            return false;
+        }
+        PhysicalJoinOperator join = (PhysicalJoinOperator) groupExpression.getOp();
+        JoinHelper joinHelper = JoinHelper.of(join, groupExpression.getChildOutputColumns(0),
+                groupExpression.getChildOutputColumns(1));
+        // without a broadcast option there is nothing to leave the decision to
+        if (joinHelper.onlyShuffle() || ConnectContext.get().getSessionVariable().getBroadcastRowCountLimit() <= 0) {
+            return false;
+        }
+        Statistics rightChildStats = groupExpression.getInputs().get(1).getStatistics();
+        return rightChildStats != null &&
+                rightChildStats.getOutputRowCount() <= ConnectContext.get().getSessionVariable()
+                        .getBroadcastRowCountLimit();
     }
 
     private void setSatisfiedPropertyWithCost(PhysicalPropertySet outputProperty,

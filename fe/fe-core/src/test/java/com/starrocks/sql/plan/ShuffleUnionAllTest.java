@@ -46,6 +46,16 @@ public class ShuffleUnionAllTest extends PlanTestBase {
             setTableStatistics(table(name), 4_000_000_000L);
         }
         setTableStatistics(table("su_m"), 200_000_000L);
+        // a mapping table small enough to broadcast
+        starRocksAssert.withTable("CREATE TABLE `su_small` (\n" +
+                "  `shard` int NULL,\n" +
+                "  `a` int NULL,\n" +
+                "  `b` int NULL\n" +
+                ") ENGINE=OLAP\n" +
+                "DUPLICATE KEY(`shard`)\n" +
+                "DISTRIBUTED BY HASH(`shard`) BUCKETS 4\n" +
+                "PROPERTIES (\"replication_num\" = \"1\");");
+        setTableStatistics(table("su_small"), 10_000_000L);
     }
 
     private static OlapTable table(String name) {
@@ -86,6 +96,29 @@ public class ShuffleUnionAllTest extends PlanTestBase {
         assertContains(joinFragment, ":UNION");
         // 3 branches + the mapping table, each hash partitioned once
         Assertions.assertEquals(4, StringUtils.countMatches(plan, "HASH_PARTITIONED: "), plan);
+    }
+
+    @Test
+    public void testSmallBuildSideIsStillBroadcast() throws Exception {
+        // 12B probe rows against a 10M-row build side, within broadcast_row_limit: the shuffled union must not
+        // crowd out broadcast
+        String sql = "with src as (\n" +
+                "  select a, b from su_f1 union all select a, b from su_f2 union all select a, b from su_f3)\n" +
+                "select distinct src.a from src left anti join [unreorder] su_small on src.a = su_small.a";
+        String plan = getFragmentPlan(sql);
+        assertContains(plan, "LEFT ANTI JOIN (BROADCAST)");
+        assertContains(plan, RANDOM_EXCHANGE);
+    }
+
+    @Test
+    public void testBuildSideTooBigToBroadcastKeepsShuffledUnion() throws Exception {
+        // the 200M-row build side is over broadcast_row_limit, so the shuffled union stays an option and wins
+        String sql = "with src as (\n" +
+                "  select a, b from su_f1 where a is not null union all select a, b from su_f2)\n" +
+                "select distinct src.a from src left anti join [unreorder] su_m on src.a = su_m.a";
+        String plan = getFragmentPlan(sql);
+        assertContains(plan, "LEFT ANTI JOIN (PARTITIONED)");
+        Assertions.assertFalse(plan.contains(RANDOM_EXCHANGE), plan);
     }
 
     @Test
