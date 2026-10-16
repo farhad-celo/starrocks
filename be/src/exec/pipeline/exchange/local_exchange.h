@@ -159,7 +159,12 @@ public:
     // is the bottleneck, so grow it and wake up the blocked sinks.
     void maybe_grow_buffer();
 
-    void observe_chunk(const ChunkPtr& chunk) { _memory_manager->observe_chunk_memory_usage(chunk->memory_usage()); }
+    // Chunk size is sampled, because Chunk::memory_usage() walks every column.
+    void observe_chunk(const ChunkPtr& chunk) {
+        if ((_observed_chunks++ & 15) == 0 && _memory_manager->observe_chunk_memory_usage(chunk->memory_usage())) {
+            _sink_observable.notify_sink_observers();
+        }
+    }
 
     size_t get_current_limit_per_driver() const { return _memory_manager->get_current_limit_per_driver(); }
     size_t get_buffer_grow_count() const { return _memory_manager->get_grow_count(); }
@@ -194,6 +199,7 @@ protected:
 
     // Stream MV
     std::atomic<int32_t> _epoch_finished_sinker = 0;
+    std::atomic<size_t> _observed_chunks = 0;
 
 private:
     Observable _sink_observable;

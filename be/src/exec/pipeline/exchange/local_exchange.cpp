@@ -405,7 +405,8 @@ bool LocalExchanger::need_input() const {
 }
 
 void LocalExchanger::maybe_grow_buffer() {
-    if (!_memory_manager->is_full() || !_memory_manager->can_grow()) {
+    // Only the memory limit is relaxed by growth, not the buffered rows limit.
+    if (!_memory_manager->is_memory_full() || !_memory_manager->can_grow()) {
         return;
     }
     for (auto* source : _source->get_sources()) {

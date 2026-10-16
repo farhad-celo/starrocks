@@ -53,8 +53,14 @@ Status LocalExchangeSinkOperator::push_chunk(RuntimeState* state, const ChunkPtr
     auto res = _exchanger->accept(chunk, _driver_sequence);
     _exchanger->maybe_grow_buffer();
     _peak_memory_usage_counter->set(_exchanger->get_memory_usage());
-    _buffer_limit_counter->set(static_cast<int64_t>(_exchanger->get_current_limit_per_driver()));
-    _buffer_grow_counter->set(static_cast<int64_t>(_exchanger->get_buffer_grow_count()));
+    auto limit = static_cast<int64_t>(_exchanger->get_current_limit_per_driver());
+    if (limit != _buffer_limit_counter->value()) {
+        _buffer_limit_counter->set(limit);
+    }
+    auto grow_count = static_cast<int64_t>(_exchanger->get_buffer_grow_count());
+    if (grow_count != _buffer_grow_counter->value()) {
+        _buffer_grow_counter->set(grow_count);
+    }
     return res;
 }
 
