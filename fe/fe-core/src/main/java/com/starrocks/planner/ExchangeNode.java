@@ -381,9 +381,6 @@ public class ExchangeNode extends PlanNode {
         }
         exchangeNode.setOffset(offset);
         exchangeNode.setPartition_type(partitionType);
-        if (disablePipelineLevelShuffle) {
-            exchangeNode.setDisable_pipeline_level_shuffle(true);
-        }
         planNode.setExchange_node(exchangeNode);
         planNode.setNode_type(TPlanNodeType.EXCHANGE_NODE);
         normalizeConjuncts(normalizer, planNode, conjuncts);
