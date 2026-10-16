@@ -1150,6 +1150,9 @@ struct TExchangeNode {
   4: optional Partitions.TPartitionType partition_type;
   5: optional bool enable_parallel_merge
   6: optional TLateMaterializeMode parallel_merge_late_materialize_mode;
+  // The senders route rows to this instance only, not to its pipeline drivers (see
+  // TDataStreamSink.disable_pipeline_level_shuffle), so the rows must be shuffled locally.
+  7: optional bool disable_pipeline_level_shuffle;
 }
 
 // This contains all of the information computed by the plan as part of the resource

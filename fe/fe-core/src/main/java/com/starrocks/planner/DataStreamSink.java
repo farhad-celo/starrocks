@@ -52,6 +52,9 @@ public class DataStreamSink extends DataSink {
 
     private boolean isMerge;
 
+    // see ExchangeNode.disablePipelineLevelShuffle
+    private boolean disablePipelineLevelShuffle;
+
     // Specify the columns which need to send, used on MultiCastSink
     private List<Integer> outputColumnIds;
 
@@ -83,6 +86,10 @@ public class DataStreamSink extends DataSink {
 
     public void setMerge(boolean isMerge) {
         this.isMerge = isMerge;
+    }
+
+    public void setDisablePipelineLevelShuffle(boolean disablePipelineLevelShuffle) {
+        this.disablePipelineLevelShuffle = disablePipelineLevelShuffle;
     }
 
     public void setOutputColumnIds(List<Integer> outputColumnIds) {
@@ -120,6 +127,9 @@ public class DataStreamSink extends DataSink {
                 new TDataStreamSink(exchNodeId.asInt(), outputPartition.toThrift());
         tStreamSink.setIs_merge(isMerge);
         tStreamSink.setDest_dop(exchDop);
+        if (disablePipelineLevelShuffle) {
+            tStreamSink.setDisable_pipeline_level_shuffle(true);
+        }
         if (outputColumnIds != null && !outputColumnIds.isEmpty()) {
             tStreamSink.setOutput_columns(outputColumnIds);
         }

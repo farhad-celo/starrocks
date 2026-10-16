@@ -145,6 +145,11 @@ struct TDataStreamSink {
 
   // Specify limit on output columns
   7: optional i64 limit;
+
+  // Route rows to the destination instance only, not to its pipeline driver, even when the query enables pipeline
+  // level shuffle; the receiver shuffles them locally. Must match disable_pipeline_level_shuffle of the destination
+  // exchange node.
+  8: optional bool disable_pipeline_level_shuffle;
 }
 
 struct TMultiCastDataStreamSink {

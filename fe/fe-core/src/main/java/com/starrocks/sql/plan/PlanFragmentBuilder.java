@@ -3321,6 +3321,13 @@ public class PlanFragmentBuilder {
             DistributionSpec spec = optExpr.getRequiredProperties().get(0).getDistributionProperty().getSpec();
             boolean isColocate = (spec instanceof HashDistributionSpec) &&
                     ((HashDistributionSpec) spec).getHashDistributionDesc().isLocal();
+            // A UNION ALL whose children are hash shuffled straight to its parent (enable_shuffle_union_all): each
+            // child is its own hash sender into this fragment, so with pipeline level shuffle every child would keep
+            // a partial chunk per destination driver, multiplying the senders' buffered memory by the number of
+            // children. Route them by instance only, and shuffle locally here instead.
+            boolean isShuffleUnionAll = setOperation instanceof PhysicalUnionOperator &&
+                    ((PhysicalUnionOperator) setOperation).isUnionAll() && spec instanceof HashDistributionSpec &&
+                    !((HashDistributionSpec) spec).getHashDistributionDesc().isLocal();
 
             if (isColocate) {
                 List<List<Expr>> localPartitionByExprsList = Lists.newArrayList();
@@ -3379,6 +3386,9 @@ public class PlanFragmentBuilder {
                 inputExecGroup.disableColocateGroup(inputFragment.getPlanRoot());
                 execGroups.remove(inputExecGroup);
                 if (inputFragment.getPlanRoot() instanceof ExchangeNode) {
+                    if (isShuffleUnionAll) {
+                        ((ExchangeNode) inputFragment.getPlanRoot()).setDisablePipelineLevelShuffle();
+                    }
                     if (isColocate) {
                         inputFragment.getChildren().forEach(fragment -> {
                             fragment.setOutputPartition(

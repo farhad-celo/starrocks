@@ -94,6 +94,10 @@ public class ExchangeNode extends PlanNode {
     // Specify the columns which need to send, work on CTE, and keep empty in other sense
     private List<Integer> receiveColumns;
 
+    // The senders route rows to the destination instance only, not to its pipeline drivers, also when the query
+    // enables pipeline level shuffle. Set on both this node and its senders' DataStreamSink.
+    private boolean disablePipelineLevelShuffle = false;
+
     /**
      * Create ExchangeNode that consumes output of inputNode.
      * An ExchangeNode doesn't have an input node as a child, which is why we
@@ -155,6 +159,14 @@ public class ExchangeNode extends PlanNode {
         this.offset = offset;
     }
 
+    public void setDisablePipelineLevelShuffle() {
+        this.disablePipelineLevelShuffle = true;
+    }
+
+    public boolean isDisablePipelineLevelShuffle() {
+        return disablePipelineLevelShuffle;
+    }
+
     public void setReceiveColumns(List<Integer> receiveColumns) {
         this.receiveColumns = receiveColumns;
     }
@@ -211,6 +223,9 @@ public class ExchangeNode extends PlanNode {
         if (partitionType != null) {
             msg.exchange_node.setPartition_type(partitionType);
             msg.exchange_node.setOffset(offset);
+        }
+        if (disablePipelineLevelShuffle) {
+            msg.exchange_node.setDisable_pipeline_level_shuffle(true);
         }
         SessionVariable sv = ConnectContext.get().getSessionVariable();
         msg.exchange_node.setEnable_parallel_merge(sv.isEnableParallelMerge());
@@ -366,6 +381,9 @@ public class ExchangeNode extends PlanNode {
         }
         exchangeNode.setOffset(offset);
         exchangeNode.setPartition_type(partitionType);
+        if (disablePipelineLevelShuffle) {
+            exchangeNode.setDisable_pipeline_level_shuffle(true);
+        }
         planNode.setExchange_node(exchangeNode);
         planNode.setNode_type(TPlanNodeType.EXCHANGE_NODE);
         normalizeConjuncts(normalizer, planNode, conjuncts);

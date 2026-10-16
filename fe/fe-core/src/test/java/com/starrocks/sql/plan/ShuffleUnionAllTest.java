@@ -122,6 +122,22 @@ public class ShuffleUnionAllTest extends PlanTestBase {
     }
 
     @Test
+    public void testBranchesShuffleByInstanceOnly() throws Exception {
+        // each branch is its own hash sender into the join fragment: route by instance only, so that pipeline level
+        // shuffle doesn't keep a partial chunk per destination driver in every branch
+        String thrift = getThriftPlan(ANTI_JOIN_SQL);
+        // the 3 branch sinks and the 3 union input exchanges, not the mapping table's sink or exchange
+        Assertions.assertEquals(6, StringUtils.countMatches(thrift, "disable_pipeline_level_shuffle:true"), thrift);
+    }
+
+    @Test
+    public void testRoundRobinUnionKeepsPipelineLevelShuffle() throws Exception {
+        connectContext.getSessionVariable().setEnableShuffleUnionAll(false);
+        String thrift = getThriftPlan(ANTI_JOIN_SQL);
+        Assertions.assertFalse(thrift.contains("disable_pipeline_level_shuffle:true"), thrift);
+    }
+
+    @Test
     public void testDisabledByDefault() throws Exception {
         connectContext.getSessionVariable().setEnableShuffleUnionAll(false);
         String plan = getFragmentPlan(ANTI_JOIN_SQL);
