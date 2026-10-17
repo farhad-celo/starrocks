@@ -25,8 +25,11 @@ namespace starrocks::pipeline {
 // Manage the memory usage for local exchange
 class ChunkBufferMemoryManager {
 public:
+    // `adaptive` opts the exchange in to the adaptive per-driver limit, see enable_local_exchange_adaptive_buffer.
+    // It is only safe for exchanges whose sources always have output when they hold data (they never wait for more
+    // rows), otherwise a small limit could stall them.
     ChunkBufferMemoryManager(size_t max_input_dop, int64_t per_driver_mem_limit,
-                             int64_t max_buffered_rows = std::numeric_limits<int64_t>::max())
+                             int64_t max_buffered_rows = std::numeric_limits<int64_t>::max(), bool adaptive = false)
             : _max_input_dop(max_input_dop) {
         _max_buffered_rows = max_buffered_rows;
         if (per_driver_mem_limit > 0) {
@@ -40,7 +43,7 @@ public:
         }
         // Snapshot the configs, so that changing them doesn't shift the limit of running queries.
         const int64_t initial = config::local_exchange_buffer_initial_mem_limit_per_driver;
-        _adaptive = config::enable_local_exchange_adaptive_buffer && initial > 0;
+        _adaptive = adaptive && config::enable_local_exchange_adaptive_buffer && initial > 0;
         _min_chunks = std::max<int64_t>(1, config::local_exchange_buffer_min_chunks_per_driver);
         _growth_factor = std::max(1.5, config::local_exchange_buffer_growth_factor);
         _limit_per_driver = _adaptive ? std::min<size_t>(initial, _max_memory_usage_per_driver) : 0;
@@ -53,9 +56,9 @@ public:
             return false;
         }
         size_t prev = _avg_chunk_memory_usage.load(std::memory_order_relaxed);
-        // Decayed average rather than max, so that a few sparse chunks don't inflate the floor.
-        // Racy read-modify-write is fine: it is only a heuristic.
-        size_t avg = prev == 0 ? bytes : prev - prev / 8 + bytes / 8;
+        // Follow an increase immediately, so that the floor doesn't lag behind a jump of the chunk size, and decay
+        // slowly otherwise. The limit never shrinks anyway. Racy read-modify-write is fine: it is only a heuristic.
+        size_t avg = bytes > prev ? bytes : prev - prev / 8 + bytes / 8;
         _avg_chunk_memory_usage.store(avg, std::memory_order_relaxed);
         return _raise_limit(_min_chunks * avg);
     }
@@ -87,6 +90,20 @@ public:
         return raised;
     }
 
+    // Raise the limit by the growth factor only if it is still `observed_limit`, so that many callers that saw the same
+    // limit (e.g. all sources flushing at once) result in a single step. Returns true if this call raised the limit.
+    bool try_grow_from(size_t observed_limit) {
+        if (!can_grow()) {
+            return false;
+        }
+        size_t target = std::min(static_cast<size_t>(observed_limit * _growth_factor), _max_memory_usage_per_driver);
+        if (target <= observed_limit || !_limit_per_driver.compare_exchange_strong(observed_limit, target)) {
+            return false;
+        }
+        _grow_count++;
+        return true;
+    }
+
     size_t get_grow_count() const { return _grow_count; }
 
     void update_memory_usage(int64_t memory_usage, int64_t num_rows) {
@@ -112,7 +129,8 @@ public:
     // Full because of the memory limit, as opposed to the buffered rows limit.
     bool is_memory_full() const { return _memory_usage >= max_memory_usage(); }
 
-    bool is_half_full() const { return _memory_usage * 2 >= max_memory_usage(); }
+    // Compared with the fixed maximum, not the adaptive limit: the connector sink writer scaling is calibrated on it.
+    bool is_half_full() const { return _memory_usage * 2 >= _max_memory_usage; }
 
     size_t get_max_input_dop() const { return _max_input_dop; }
 

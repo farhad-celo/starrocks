@@ -186,11 +186,17 @@ ChunkPtr LocalExchangeSourceOperator::_pull_shuffle_chunk(RuntimeState* state) {
     std::vector<PartitionChunk> selected_partition_chunks;
     size_t num_rows = 0;
     size_t memory_usage = 0;
+    // Set if an under-filled chunk is flushed only because the local buffer is almost full.
+    bool flushed_by_small_limit = false;
+    size_t observed_limit = 0;
     // Lock during pop partition chunks from queue.
     {
         std::lock_guard<std::mutex> l(_chunk_lock);
 
         DCHECK(!_partition_chunk_queue.empty());
+        observed_limit = _memory_manager->get_current_limit_per_driver();
+        flushed_by_small_limit =
+                !_is_finished && _partition_rows_num < state->chunk_size() && _local_buffer_almost_full();
 
         while (!_partition_chunk_queue.empty() &&
                num_rows + _partition_chunk_queue.front().size <= state->chunk_size()) {
@@ -205,6 +211,11 @@ ChunkPtr LocalExchangeSourceOperator::_pull_shuffle_chunk(RuntimeState* state) {
     }
     if (selected_partition_chunks.empty()) {
         throw std::runtime_error("local exchange gets empty shuffled chunk.");
+    }
+    if (flushed_by_small_limit) {
+        // The limit is too small to assemble a full chunk. The flush also drains the buffer, so the sinks never see it
+        // full and nobody else would grow it.
+        down_cast<LocalExchangeSourceOperatorFactory*>(_factory)->exchanger()->grow_buffer_from(observed_limit);
     }
     // Unlock during merging partition chunks into a full chunk.
     ChunkPtr chunk = selected_partition_chunks[0].chunk->clone_empty_with_slot();
