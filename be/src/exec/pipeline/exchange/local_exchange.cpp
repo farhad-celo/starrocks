@@ -416,12 +416,11 @@ void LocalExchanger::maybe_grow_buffer(const LocalExchangeSourceOperator* starve
     if (starved_hint != nullptr && !starved_hint->is_starved()) {
         return;
     }
-    // The scan takes the lock of each source, so don't let all the sinks and sources do it at the same time.
-    if (_grow_scan_running.exchange(true)) {
-        _grow_rescan = true;
-        return;
-    }
-    do {
+    // The scan takes the lock of each source, so only one thread scans at a time. A caller that doesn't get to scan has
+    // already published its request in _grow_rescan, and the scanning thread re-checks it after releasing the scan
+    // flag, so the request isn't lost.
+    _grow_rescan = true;
+    while (!_grow_scan_running.exchange(true)) {
         _grow_rescan = false;
         // Growing from the limit seen before the scan makes concurrent triggers result in a single step.
         size_t observed_limit = _memory_manager->get_current_limit_per_driver();
@@ -436,8 +435,11 @@ void LocalExchanger::maybe_grow_buffer(const LocalExchangeSourceOperator* starve
             _sink_observable.notify_sink_observers();
         }
         starved_hint = nullptr;
-    } while (_grow_rescan.load() && _memory_manager->is_memory_full() && _memory_manager->can_grow());
-    _grow_scan_running = false;
+        _grow_scan_running = false;
+        if (!_grow_rescan.load() || !_memory_manager->is_memory_full() || !_memory_manager->can_grow()) {
+            return;
+        }
+    }
 }
 
 void RandomPassthroughExchanger::incr_sinker() {

@@ -135,8 +135,9 @@ OpFactories PipelineBuilderContext::_maybe_interpolate_local_passthrough_exchang
     pred_operators = maybe_interpolate_grouped_exchange(plan_node_id, pred_operators);
 
     int max_input_dop = std::max(num_receivers, static_cast<int>(source_op->degree_of_parallelism()));
-    // Decide the exchanger once, so that the adaptive buffer limit follows it: only the plain round-robin
-    // PassthroughExchanger (the fall-through case) uses it.
+    // Decide the exchanger once, so that the adaptive buffer limit follows it: within this builder, only the plain
+    // round-robin PassthroughExchanger (the fall-through case) uses it. Whole chunks are queued, so a full buffer
+    // always means that some source has output.
     enum class Kind { ADAPTIVE, RANDOM, CONNECTOR_SINK, PLAIN };
     Kind kind = Kind::PLAIN;
     if (pass_through_type == LocalExchanger::PassThroughType::ADPATIVE) {
@@ -254,6 +255,8 @@ OpFactories PipelineBuilderContext::_do_maybe_interpolate_local_shuffle_exchange
     int64_t limit_size = _prev_limit_size(pred_operators);
 
     // To make sure at least one partition source operator is ready to output chunk before sink operators are full.
+    // Adaptive: the number of sources equals max_input_dop, so a full buffer means some source holds more than its
+    // share and flushes its partial rows.
     auto mem_mgr = std::make_shared<ChunkBufferMemoryManager>(shuffle_partitions_num,
                                                               config::local_exchange_buffer_mem_limit_per_driver,
                                                               std::numeric_limits<int64_t>::max(), true);
