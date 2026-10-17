@@ -36,6 +36,11 @@
 namespace starrocks::pipeline {
 
 namespace {
+// One growth step from the current limit.
+bool grow(ChunkBufferMemoryManager& mgr) {
+    return mgr.try_grow_from(mgr.get_current_limit_per_driver());
+}
+
 constexpr size_t kMaxPerDriver = 16000;
 constexpr size_t kInitialPerDriver = 1000;
 constexpr size_t kDop = 2;
@@ -132,7 +137,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, disabled_uses_max_limit) {
     ASSERT_EQ(kMaxPerDriver, mgr.get_current_limit_per_driver());
     ASSERT_EQ(kDop * kMaxPerDriver, mgr.max_memory_usage());
     ASSERT_FALSE(mgr.can_grow());
-    ASSERT_FALSE(mgr.try_grow());
+    ASSERT_FALSE(grow(mgr));
     ASSERT_EQ(0, mgr.get_grow_count());
 }
 
@@ -167,7 +172,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, grow_multiplies_and_clamps_at_max) {
     size_t expected = kInitialPerDriver;
     size_t grows = 0;
     while (expected < kMaxPerDriver) {
-        ASSERT_TRUE(mgr.try_grow());
+        ASSERT_TRUE(grow(mgr));
         expected = std::min<size_t>(expected * 2, kMaxPerDriver);
         grows++;
         ASSERT_EQ(expected, mgr.get_current_limit_per_driver());
@@ -178,7 +183,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, grow_multiplies_and_clamps_at_max) {
 
     // At the ceiling nothing can grow anymore.
     ASSERT_FALSE(mgr.can_grow());
-    ASSERT_FALSE(mgr.try_grow());
+    ASSERT_FALSE(grow(mgr));
     ASSERT_EQ(kMaxPerDriver, mgr.get_current_limit_per_driver());
     ASSERT_EQ(grows, mgr.get_grow_count());
 }
@@ -187,7 +192,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, small_growth_factor_is_clamped) {
     config::local_exchange_buffer_growth_factor = 1.0;
     ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
-    ASSERT_TRUE(mgr.try_grow());
+    ASSERT_TRUE(grow(mgr));
     ASSERT_EQ(1500, mgr.get_current_limit_per_driver());
 }
 
@@ -199,7 +204,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, configs_are_snapshotted_at_construction)
     ASSERT_EQ(kInitialPerDriver, mgr.get_current_limit_per_driver());
     mgr.observe_chunk_memory_usage(100);
     ASSERT_EQ(kInitialPerDriver, mgr.get_current_limit_per_driver());
-    ASSERT_TRUE(mgr.try_grow());
+    ASSERT_TRUE(grow(mgr));
     ASSERT_EQ(2 * kInitialPerDriver, mgr.get_current_limit_per_driver());
 }
 
@@ -223,8 +228,10 @@ TEST_F(LocalExchangeAdaptiveBufferTest, concurrent_grow_counts_only_winners) {
     std::atomic<size_t> raised{0};
     for (int i = 0; i < 8; i++) {
         threads.emplace_back([&] {
-            while (mgr.try_grow()) {
-                raised++;
+            while (mgr.can_grow()) {
+                if (grow(mgr)) {
+                    raised++;
+                }
             }
         });
     }
@@ -298,7 +305,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, is_full_follows_grown_limit) {
 
     mgr.update_memory_usage(kDop * kInitialPerDriver, 10);
     ASSERT_TRUE(mgr.is_full());
-    ASSERT_TRUE(mgr.try_grow());
+    ASSERT_TRUE(grow(mgr));
     ASSERT_FALSE(mgr.is_full());
 }
 
@@ -311,7 +318,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, release_mode_pins_limit_and_blocks_growt
     // The reported per-driver limit is the pinned one, not the adaptive one.
     ASSERT_EQ(500 / kDop, mgr.get_current_limit_per_driver());
     ASSERT_FALSE(mgr.can_grow());
-    ASSERT_FALSE(mgr.try_grow());
+    ASSERT_FALSE(grow(mgr));
 
     // Neither a larger chunk floor nor a growth attempt may undo the pinned limit.
     mgr.observe_chunk_memory_usage(1000000);
@@ -477,7 +484,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, source_flush_threshold_follows_current_l
     ASSERT_TRUE(source(0)->has_output());
 
     // After growth the same buffered bytes are well below 80% of the new limit, so keep accumulating rows.
-    ASSERT_TRUE(_memory_manager->try_grow());
+    ASSERT_TRUE(grow(*_memory_manager));
     ASSERT_FALSE(source(0)->has_output());
 }
 

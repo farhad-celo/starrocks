@@ -81,18 +81,6 @@ public:
         return _adaptive && !_release_mode.load() && _limit_per_driver.load() < _max_memory_usage_per_driver;
     }
 
-    // Raise the per-driver limit by the growth factor. Returns true if this call raised the limit.
-    bool try_grow() {
-        if (!can_grow()) {
-            return false;
-        }
-        bool raised = _raise_limit(static_cast<size_t>(_limit_per_driver.load() * _growth_factor));
-        if (raised) {
-            _grow_count++;
-        }
-        return raised;
-    }
-
     // Raise the limit by the growth factor only if it is still `observed_limit`, so that many callers that saw the same
     // limit (e.g. all sources flushing at once) result in a single step. Returns true if this call raised the limit.
     bool try_grow_from(size_t observed_limit) {
@@ -141,8 +129,9 @@ public:
     // Enters the release memory mode: the total limit is pinned to the given value and never grows again.
     void update_max_memory_usage(size_t max_memory_usage) {
         DCHECK(max_memory_usage > 0);
-        _max_memory_usage = max_memory_usage;
+        // Set the mode first, so that a concurrent growth can't raise the limit after the pinned value is written.
         _release_mode = true;
+        _max_memory_usage = max_memory_usage;
     }
 
     bool in_release_mode() const { return _release_mode; }
