@@ -138,8 +138,8 @@ StatusOr<ChunkPtr> LocalExchangeSourceOperator::pull_chunk(RuntimeState* state) 
         chunk = _pull_key_partition_chunk(state);
     }
     // This source may be left starved while the sinks are blocked by a full buffer. Nobody else would grow the buffer
-    // then, because growth is otherwise only attempted by the sinks after a push.
-    exchanger->maybe_grow_buffer();
+    // then, because growth is otherwise only attempted by the sinks after a push. Only this source is checked.
+    exchanger->maybe_grow_buffer(this);
     return std::move(chunk);
 }
 

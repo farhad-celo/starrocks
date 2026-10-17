@@ -429,6 +429,43 @@ TEST_F(LocalExchangeAdaptiveBufferTest, finished_source_is_not_starved) {
 
 // ---- LocalExchangeSourceOperator flush threshold ----
 
+TEST_F(LocalExchangeAdaptiveBufferTest, release_mode_ignores_chunk_samples) {
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
+
+    mgr.update_max_memory_usage(500);
+    // Nothing reads the adaptive limit anymore, so a sample must not report a raise (and wake the sinks).
+    ASSERT_FALSE(mgr.observe_chunk_memory_usage(3000));
+}
+
+TEST_F(LocalExchangeAdaptiveBufferTest, is_adaptive_follows_opt_in) {
+    ChunkBufferMemoryManager adaptive(kDop, kMaxPerDriver, kNoRowsLimit, true);
+    ChunkBufferMemoryManager fixed(kDop, kMaxPerDriver);
+    ASSERT_TRUE(adaptive.is_adaptive());
+    ASSERT_FALSE(fixed.is_adaptive());
+}
+
+TEST_F(LocalExchangeAdaptiveBufferTest, drained_source_does_not_grow_when_it_is_not_starved) {
+    build_exchange();
+
+    // Both sources hold data and the buffer is full: pulling from source 0 leaves it with output, so the hint
+    // must not cause a growth step.
+    fill_until_full([](int i) { return i % 2; });
+    size_t limit_before = _exchanger->get_current_limit_per_driver();
+    _exchanger->maybe_grow_buffer(source(0));
+    ASSERT_EQ(limit_before, _exchanger->get_current_limit_per_driver());
+    ASSERT_EQ(0, _exchanger->get_buffer_grow_count());
+}
+
+TEST_F(LocalExchangeAdaptiveBufferTest, starved_hint_grows_once) {
+    build_exchange();
+
+    fill_until_full([](int) { return 0; });
+    size_t limit_before = _exchanger->get_current_limit_per_driver();
+    _exchanger->maybe_grow_buffer(source(1));
+    ASSERT_EQ(2 * limit_before, _exchanger->get_current_limit_per_driver());
+    ASSERT_EQ(1, _exchanger->get_buffer_grow_count());
+}
+
 TEST_F(LocalExchangeAdaptiveBufferTest, source_flush_threshold_follows_current_limit) {
     build_exchange();
 

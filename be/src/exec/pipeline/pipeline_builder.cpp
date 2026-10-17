@@ -135,13 +135,20 @@ OpFactories PipelineBuilderContext::_maybe_interpolate_local_passthrough_exchang
     pred_operators = maybe_interpolate_grouped_exchange(plan_node_id, pred_operators);
 
     int max_input_dop = std::max(num_receivers, static_cast<int>(source_op->degree_of_parallelism()));
-    // Only the round-robin PassthroughExchanger (the last branch below) uses the adaptive buffer limit.
-    const bool use_connector_sink_exchanger = state->query_options().__isset.enable_connector_sink_writer_scaling &&
-                                              state->query_options().enable_connector_sink_writer_scaling &&
-                                              pass_through_type == LocalExchanger::PassThroughType::SCALE;
-    const bool adaptive_buffer = pass_through_type != LocalExchanger::PassThroughType::ADPATIVE &&
-                                 pass_through_type != LocalExchanger::PassThroughType::RANDOM &&
-                                 !use_connector_sink_exchanger;
+    // Decide the exchanger once, so that the adaptive buffer limit follows it: only the plain round-robin
+    // PassthroughExchanger (the fall-through case) uses it.
+    enum class Kind { ADAPTIVE, RANDOM, CONNECTOR_SINK, PLAIN };
+    Kind kind = Kind::PLAIN;
+    if (pass_through_type == LocalExchanger::PassThroughType::ADPATIVE) {
+        kind = Kind::ADAPTIVE;
+    } else if (pass_through_type == LocalExchanger::PassThroughType::RANDOM) {
+        kind = Kind::RANDOM;
+    } else if (state->query_options().__isset.enable_connector_sink_writer_scaling &&
+               state->query_options().enable_connector_sink_writer_scaling &&
+               pass_through_type == LocalExchanger::PassThroughType::SCALE) {
+        kind = Kind::CONNECTOR_SINK;
+    }
+    const bool adaptive_buffer = kind == Kind::PLAIN;
     auto mem_mgr = std::make_shared<ChunkBufferMemoryManager>(max_input_dop,
                                                               config::local_exchange_buffer_mem_limit_per_driver,
                                                               std::numeric_limits<int64_t>::max(), adaptive_buffer);
@@ -153,13 +160,11 @@ OpFactories PipelineBuilderContext::_maybe_interpolate_local_passthrough_exchang
     local_exchange_source->set_degree_of_parallelism(num_receivers);
 
     std::shared_ptr<LocalExchanger> local_exchange;
-    if (pass_through_type == LocalExchanger::PassThroughType::ADPATIVE) {
+    if (kind == Kind::ADAPTIVE) {
         local_exchange = std::make_shared<AdaptivePassthroughExchanger>(mem_mgr, local_exchange_source.get());
-    } else if (pass_through_type == LocalExchanger::PassThroughType::RANDOM) {
+    } else if (kind == Kind::RANDOM) {
         local_exchange = std::make_shared<RandomPassthroughExchanger>(mem_mgr, local_exchange_source.get());
-    } else if (state->query_options().__isset.enable_connector_sink_writer_scaling &&
-               state->query_options().enable_connector_sink_writer_scaling &&
-               pass_through_type == LocalExchanger::PassThroughType::SCALE) {
+    } else if (kind == Kind::CONNECTOR_SINK) {
         local_exchange = std::make_shared<ConnectorSinkPassthroughExchanger>(mem_mgr, local_exchange_source.get());
     } else {
         local_exchange = std::make_shared<PassthroughExchanger>(mem_mgr, local_exchange_source.get());

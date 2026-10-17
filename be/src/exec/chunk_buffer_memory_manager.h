@@ -26,8 +26,9 @@ namespace starrocks::pipeline {
 class ChunkBufferMemoryManager {
 public:
     // `adaptive` opts the exchange in to the adaptive per-driver limit, see enable_local_exchange_adaptive_buffer.
-    // It is only safe for exchanges whose sources always have output when they hold data (they never wait for more
-    // rows), otherwise a small limit could stall them.
+    // It is only safe for exchanges where a full buffer implies that some source has output: whole chunks are
+    // queued, or the number of sources doesn't exceed max_input_dop so that a source holding its share flushes its
+    // partial rows.
     ChunkBufferMemoryManager(size_t max_input_dop, int64_t per_driver_mem_limit,
                              int64_t max_buffered_rows = std::numeric_limits<int64_t>::max(), bool adaptive = false)
             : _max_input_dop(max_input_dop) {
@@ -52,7 +53,7 @@ public:
     // The sink reports the size of the chunks it pushes, so that the buffer limit is never smaller than a few chunks.
     // Returns true if the limit was raised.
     bool observe_chunk_memory_usage(size_t bytes) {
-        if (!_adaptive || bytes == 0) {
+        if (!_adaptive || _release_mode.load() || bytes == 0) {
             return false;
         }
         size_t prev = _avg_chunk_memory_usage.load(std::memory_order_relaxed);
@@ -73,6 +74,8 @@ public:
         }
         return _limit_per_driver.load();
     }
+
+    bool is_adaptive() const { return _adaptive; }
 
     bool can_grow() const {
         return _adaptive && !_release_mode.load() && _limit_per_driver.load() < _max_memory_usage_per_driver;
@@ -129,7 +132,8 @@ public:
     // Full because of the memory limit, as opposed to the buffered rows limit.
     bool is_memory_full() const { return _memory_usage >= max_memory_usage(); }
 
-    // Compared with the fixed maximum, not the adaptive limit: the connector sink writer scaling is calibrated on it.
+    // Compared with the maximum limit of the exchange (lowered only by the release memory mode), not the adaptive
+    // limit: the connector sink writer scaling is calibrated on it, and that exchanger is never adaptive.
     bool is_half_full() const { return _memory_usage * 2 >= _max_memory_usage; }
 
     size_t get_max_input_dop() const { return _max_input_dop; }
