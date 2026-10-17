@@ -157,7 +157,11 @@ public:
 
     // Called by the sink after pushing a chunk. If the buffer is full while some source is starved, the buffer limit
     // is the bottleneck, so grow it and wake up the blocked sinks.
-    void maybe_grow_buffer();
+    // `starved_hint` is a source that is known to be (maybe) starved, e.g. the one that has just been pulled, so that
+    // only it has to be checked instead of scanning all of the sources.
+    void maybe_grow_buffer(const LocalExchangeSourceOperator* starved_hint = nullptr);
+
+    bool is_adaptive_buffer() const { return _memory_manager->is_adaptive(); }
 
     // The caller samples the chunks, because Chunk::memory_usage() walks every column.
     void observe_chunk(const ChunkPtr& chunk) {
@@ -210,8 +214,10 @@ protected:
 
 private:
     Observable _sink_observable;
-    // Only one thread scans the sources in maybe_grow_buffer() at a time.
+    // Only one thread scans the sources in maybe_grow_buffer() at a time. A caller that loses the race asks the winner
+    // to scan again, so that its trigger isn't dropped.
     std::atomic<bool> _grow_scan_running = false;
+    std::atomic<bool> _grow_rescan = false;
 };
 
 // Exchange the local data for shuffle

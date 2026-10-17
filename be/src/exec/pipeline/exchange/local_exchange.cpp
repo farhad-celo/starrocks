@@ -405,24 +405,39 @@ bool LocalExchanger::need_input() const {
     return !_memory_manager->is_full() && !is_all_sources_finished();
 }
 
-void LocalExchanger::maybe_grow_buffer() {
+void LocalExchanger::maybe_grow_buffer(const LocalExchangeSourceOperator* starved_hint) {
+    if (!_memory_manager->is_adaptive()) {
+        return;
+    }
     // Only the memory limit is relaxed by growth, not the buffered rows limit.
     if (!_memory_manager->is_memory_full() || !_memory_manager->can_grow()) {
         return;
     }
-    // The scan takes the lock of each source, so don't let all the sinks and sources do it at the same time.
-    if (_grow_scan_running.exchange(true)) {
+    if (starved_hint != nullptr && !starved_hint->is_starved()) {
         return;
     }
-    DeferOp reset([this]() { _grow_scan_running = false; });
-    for (auto* source : _source->get_sources()) {
-        if (source->is_starved()) {
-            if (_memory_manager->try_grow()) {
-                _sink_observable.notify_sink_observers();
-            }
-            return;
-        }
+    // The scan takes the lock of each source, so don't let all the sinks and sources do it at the same time.
+    if (_grow_scan_running.exchange(true)) {
+        _grow_rescan = true;
+        return;
     }
+    do {
+        _grow_rescan = false;
+        // Growing from the limit seen before the scan makes concurrent triggers result in a single step.
+        size_t observed_limit = _memory_manager->get_current_limit_per_driver();
+        bool starved = starved_hint != nullptr;
+        for (auto* source : _source->get_sources()) {
+            if (starved) {
+                break;
+            }
+            starved = source->is_starved();
+        }
+        if (starved && _memory_manager->try_grow_from(observed_limit)) {
+            _sink_observable.notify_sink_observers();
+        }
+        starved_hint = nullptr;
+    } while (_grow_rescan.load() && _memory_manager->is_memory_full() && _memory_manager->can_grow());
+    _grow_scan_running = false;
 }
 
 void RandomPassthroughExchanger::incr_sinker() {
