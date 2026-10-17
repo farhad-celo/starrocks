@@ -70,6 +70,7 @@ private:
     bool _is_finished = false;
     const std::shared_ptr<LocalExchanger>& _exchanger;
     RuntimeProfile::HighWaterMarkCounter* _peak_memory_usage_counter = nullptr;
+    size_t _pushed_chunks = 0;
     RuntimeProfile::Counter* _buffer_limit_counter = nullptr;
     RuntimeProfile::Counter* _buffer_grow_counter = nullptr;
     // STREAM MV

@@ -23,6 +23,7 @@
 #include "exec/pipeline/exchange/shuffler.h"
 #include "exprs/expr_context.h"
 #include "gutil/hash/hash.h"
+#include "util/defer_op.h"
 #include "util/runtime_profile.h"
 
 namespace starrocks::pipeline {
@@ -409,6 +410,11 @@ void LocalExchanger::maybe_grow_buffer() {
     if (!_memory_manager->is_memory_full() || !_memory_manager->can_grow()) {
         return;
     }
+    // The scan takes the lock of each source, so don't let all the sinks and sources do it at the same time.
+    if (_grow_scan_running.exchange(true)) {
+        return;
+    }
+    DeferOp reset([this]() { _grow_scan_running = false; });
     for (auto* source : _source->get_sources()) {
         if (source->is_starved()) {
             if (_memory_manager->try_grow()) {

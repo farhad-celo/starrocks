@@ -28,8 +28,11 @@ Status LocalExchangeSinkOperator::prepare(RuntimeState* state) {
     _peak_memory_usage_counter = _unique_metrics->AddHighWaterMarkCounter(
             "LocalExchangePeakMemoryUsage", TUnit::BYTES,
             RuntimeProfile::Counter::create_strategy(TUnit::BYTES, TCounterMergeType::SKIP_FIRST_MERGE));
-    _buffer_limit_counter = ADD_COUNTER(_unique_metrics, "LocalExchangeBufferLimitPerDriver", TUnit::BYTES);
-    _buffer_grow_counter = ADD_COUNTER(_unique_metrics, "LocalExchangeBufferGrowCount", TUnit::UNIT);
+    // These are exchanger-wide values reported by every sink driver, so don't sum them.
+    _buffer_limit_counter = ADD_COUNTER_SKIP_MERGE(_unique_metrics, "LocalExchangeBufferLimitPerDriver", TUnit::BYTES,
+                                                   TCounterMergeType::SKIP_FIRST_MERGE);
+    _buffer_grow_counter = ADD_COUNTER_SKIP_MERGE(_unique_metrics, "LocalExchangeBufferGrowCount", TUnit::UNIT,
+                                                  TCounterMergeType::SKIP_FIRST_MERGE);
     _exchanger->attach_sink_observer(state, this->observer());
     return Status::OK();
 }
@@ -49,7 +52,10 @@ Status LocalExchangeSinkOperator::set_finishing(RuntimeState* state) {
 }
 
 Status LocalExchangeSinkOperator::push_chunk(RuntimeState* state, const ChunkPtr& chunk) {
-    _exchanger->observe_chunk(chunk);
+    // Chunk::memory_usage() walks every column, so only sample the chunk size.
+    if ((_pushed_chunks++ & 15) == 0) {
+        _exchanger->observe_chunk(chunk);
+    }
     auto res = _exchanger->accept(chunk, _driver_sequence);
     _exchanger->maybe_grow_buffer();
     _peak_memory_usage_counter->set(_exchanger->get_memory_usage());

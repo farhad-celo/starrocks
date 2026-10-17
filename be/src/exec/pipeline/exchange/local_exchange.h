@@ -159,9 +159,17 @@ public:
     // is the bottleneck, so grow it and wake up the blocked sinks.
     void maybe_grow_buffer();
 
-    // Chunk size is sampled, because Chunk::memory_usage() walks every column.
+    // The caller samples the chunks, because Chunk::memory_usage() walks every column.
     void observe_chunk(const ChunkPtr& chunk) {
-        if ((_observed_chunks++ & 15) == 0 && _memory_manager->observe_chunk_memory_usage(chunk->memory_usage())) {
+        if (_memory_manager->observe_chunk_memory_usage(chunk->memory_usage())) {
+            _sink_observable.notify_sink_observers();
+        }
+    }
+
+    // A source flushed an under-filled chunk because its local buffer was almost full, so the limit is too small.
+    // `observed_limit` is the limit the source saw.
+    void grow_buffer_from(size_t observed_limit) {
+        if (_memory_manager->try_grow_from(observed_limit)) {
             _sink_observable.notify_sink_observers();
         }
     }
@@ -199,10 +207,11 @@ protected:
 
     // Stream MV
     std::atomic<int32_t> _epoch_finished_sinker = 0;
-    std::atomic<size_t> _observed_chunks = 0;
 
 private:
     Observable _sink_observable;
+    // Only one thread scans the sources in maybe_grow_buffer() at a time.
+    std::atomic<bool> _grow_scan_running = false;
 };
 
 // Exchange the local data for shuffle

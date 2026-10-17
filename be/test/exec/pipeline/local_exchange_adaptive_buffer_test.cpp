@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <limits>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -38,6 +39,7 @@ namespace {
 constexpr size_t kMaxPerDriver = 16000;
 constexpr size_t kInitialPerDriver = 1000;
 constexpr size_t kDop = 2;
+constexpr int64_t kNoRowsLimit = std::numeric_limits<int64_t>::max();
 
 ChunkPtr make_chunk(size_t num_rows) {
     auto chunk = std::make_shared<Chunk>();
@@ -73,7 +75,7 @@ protected:
     // Builds a memory manager, `kDop` sources and a DirectThroughExchanger on top of them.
     // Chunks from sink sequence `i` always go to source `i % kDop`, so a test controls which source is starved.
     void build_exchange() {
-        _memory_manager = std::make_shared<ChunkBufferMemoryManager>(kDop, kMaxPerDriver);
+        _memory_manager = std::make_shared<ChunkBufferMemoryManager>(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
         _query_context = std::make_shared<QueryContext>();
         _query_context->init_mem_tracker(-1, GlobalEnv::GetInstance()->process_mem_tracker());
@@ -125,7 +127,7 @@ protected:
 
 TEST_F(LocalExchangeAdaptiveBufferTest, disabled_uses_max_limit) {
     config::enable_local_exchange_adaptive_buffer = false;
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     ASSERT_EQ(kMaxPerDriver, mgr.get_current_limit_per_driver());
     ASSERT_EQ(kDop * kMaxPerDriver, mgr.max_memory_usage());
@@ -134,16 +136,25 @@ TEST_F(LocalExchangeAdaptiveBufferTest, disabled_uses_max_limit) {
     ASSERT_EQ(0, mgr.get_grow_count());
 }
 
+TEST_F(LocalExchangeAdaptiveBufferTest, not_adaptive_unless_opted_in) {
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+
+    ASSERT_EQ(kMaxPerDriver, mgr.get_current_limit_per_driver());
+    ASSERT_EQ(kDop * kMaxPerDriver, mgr.max_memory_usage());
+    ASSERT_FALSE(mgr.can_grow());
+    ASSERT_FALSE(mgr.observe_chunk_memory_usage(3000));
+}
+
 TEST_F(LocalExchangeAdaptiveBufferTest, zero_initial_limit_disables) {
     config::local_exchange_buffer_initial_mem_limit_per_driver = 0;
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     ASSERT_EQ(kMaxPerDriver, mgr.get_current_limit_per_driver());
     ASSERT_FALSE(mgr.can_grow());
 }
 
 TEST_F(LocalExchangeAdaptiveBufferTest, starts_at_initial_limit) {
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     ASSERT_EQ(kInitialPerDriver, mgr.get_current_limit_per_driver());
     ASSERT_EQ(kDop * kInitialPerDriver, mgr.max_memory_usage());
@@ -151,7 +162,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, starts_at_initial_limit) {
 }
 
 TEST_F(LocalExchangeAdaptiveBufferTest, grow_multiplies_and_clamps_at_max) {
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     size_t expected = kInitialPerDriver;
     size_t grows = 0;
@@ -174,14 +185,14 @@ TEST_F(LocalExchangeAdaptiveBufferTest, grow_multiplies_and_clamps_at_max) {
 
 TEST_F(LocalExchangeAdaptiveBufferTest, small_growth_factor_is_clamped) {
     config::local_exchange_buffer_growth_factor = 1.0;
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     ASSERT_TRUE(mgr.try_grow());
     ASSERT_EQ(1500, mgr.get_current_limit_per_driver());
 }
 
 TEST_F(LocalExchangeAdaptiveBufferTest, configs_are_snapshotted_at_construction) {
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     config::local_exchange_buffer_min_chunks_per_driver = 1000000;
     config::local_exchange_buffer_growth_factor = 8.0;
@@ -193,7 +204,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, configs_are_snapshotted_at_construction)
 }
 
 TEST_F(LocalExchangeAdaptiveBufferTest, limit_never_shrinks) {
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     ASSERT_TRUE(mgr.observe_chunk_memory_usage(3000));
     ASSERT_EQ(6000, mgr.get_current_limit_per_driver());
@@ -206,7 +217,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, limit_never_shrinks) {
 }
 
 TEST_F(LocalExchangeAdaptiveBufferTest, concurrent_grow_counts_only_winners) {
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     std::vector<std::thread> threads;
     std::atomic<size_t> raised{0};
@@ -225,7 +236,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, concurrent_grow_counts_only_winners) {
 }
 
 TEST_F(LocalExchangeAdaptiveBufferTest, chunk_floor_raises_limit) {
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     // 2 chunks of 3000 bytes need 6000 bytes, more than the 1000 initial limit.
     ASSERT_TRUE(mgr.observe_chunk_memory_usage(3000));
@@ -233,34 +244,57 @@ TEST_F(LocalExchangeAdaptiveBufferTest, chunk_floor_raises_limit) {
     ASSERT_EQ(kDop * 6000, mgr.max_memory_usage());
 
     // The floor is clamped to the ceiling.
-    ChunkBufferMemoryManager huge(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager huge(kDop, kMaxPerDriver, kNoRowsLimit, true);
     huge.observe_chunk_memory_usage(kMaxPerDriver * 10);
     ASSERT_EQ(kMaxPerDriver, huge.get_current_limit_per_driver());
     ASSERT_FALSE(huge.can_grow());
 }
 
-TEST_F(LocalExchangeAdaptiveBufferTest, chunk_floor_uses_decayed_average_not_max) {
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+TEST_F(LocalExchangeAdaptiveBufferTest, chunk_floor_follows_a_jump_immediately) {
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 10; i++) {
         mgr.observe_chunk_memory_usage(100);
     }
-    // One sparse outlier must not inflate the floor: 7/8 * 100 + 4000/8 = 587 -> floor 1174 at most.
-    mgr.observe_chunk_memory_usage(4000);
-    ASSERT_LT(mgr.get_current_limit_per_driver(), 2 * 4000);
-    ASSERT_LE(mgr.get_current_limit_per_driver(), 1200);
+    ASSERT_EQ(kInitialPerDriver, mgr.get_current_limit_per_driver());
+    // A single wider chunk raises the floor at once, without waiting for the average to catch up.
+    ASSERT_TRUE(mgr.observe_chunk_memory_usage(3000));
+    ASSERT_EQ(6000, mgr.get_current_limit_per_driver());
+}
+
+TEST_F(LocalExchangeAdaptiveBufferTest, try_grow_from_steps_once_for_concurrent_callers) {
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
+
+    size_t observed = mgr.get_current_limit_per_driver();
+    ASSERT_TRUE(mgr.try_grow_from(observed));
+    // Everybody else saw the same limit, so they don't step again.
+    ASSERT_FALSE(mgr.try_grow_from(observed));
+    ASSERT_FALSE(mgr.try_grow_from(observed));
+    ASSERT_EQ(2 * kInitialPerDriver, mgr.get_current_limit_per_driver());
+    ASSERT_EQ(1, mgr.get_grow_count());
+}
+
+TEST_F(LocalExchangeAdaptiveBufferTest, half_full_uses_the_fixed_maximum) {
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
+
+    // Well above half of the adaptive limit, far below half of the maximum.
+    mgr.update_memory_usage(kDop * kInitialPerDriver, 10);
+    ASSERT_TRUE(mgr.is_full());
+    ASSERT_FALSE(mgr.is_half_full());
+    mgr.update_memory_usage(kDop * kMaxPerDriver / 2, 10);
+    ASSERT_TRUE(mgr.is_half_full());
 }
 
 TEST_F(LocalExchangeAdaptiveBufferTest, observe_ignored_when_disabled) {
     config::enable_local_exchange_adaptive_buffer = false;
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     mgr.observe_chunk_memory_usage(3000);
     ASSERT_EQ(kMaxPerDriver, mgr.get_current_limit_per_driver());
 }
 
 TEST_F(LocalExchangeAdaptiveBufferTest, is_full_follows_grown_limit) {
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     mgr.update_memory_usage(kDop * kInitialPerDriver, 10);
     ASSERT_TRUE(mgr.is_full());
@@ -269,7 +303,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, is_full_follows_grown_limit) {
 }
 
 TEST_F(LocalExchangeAdaptiveBufferTest, release_mode_pins_limit_and_blocks_growth) {
-    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver);
+    ChunkBufferMemoryManager mgr(kDop, kMaxPerDriver, kNoRowsLimit, true);
 
     mgr.update_max_memory_usage(500);
     ASSERT_TRUE(mgr.in_release_mode());
@@ -334,7 +368,7 @@ TEST_F(LocalExchangeAdaptiveBufferTest, does_not_grow_when_buffer_not_full) {
 
 TEST_F(LocalExchangeAdaptiveBufferTest, does_not_grow_when_full_because_of_rows_limit) {
     // Rows limit of 100, far below the memory limit.
-    _memory_manager = std::make_shared<ChunkBufferMemoryManager>(kDop, kMaxPerDriver, 100);
+    _memory_manager = std::make_shared<ChunkBufferMemoryManager>(kDop, kMaxPerDriver, 100, true);
     _memory_manager->update_memory_usage(10, 1000);
     ASSERT_TRUE(_memory_manager->is_full());
     ASSERT_FALSE(_memory_manager->is_memory_full());
@@ -408,6 +442,34 @@ TEST_F(LocalExchangeAdaptiveBufferTest, source_flush_threshold_follows_current_l
     // After growth the same buffered bytes are well below 80% of the new limit, so keep accumulating rows.
     ASSERT_TRUE(_memory_manager->try_grow());
     ASSERT_FALSE(source(0)->has_output());
+}
+
+TEST_F(LocalExchangeAdaptiveBufferTest, source_flush_of_underfilled_chunk_grows_buffer) {
+    build_exchange();
+
+    // The partial chunk is flushed only because it exceeds 80% of the small limit, and the buffer is not full,
+    // so the only trigger left is the flush itself.
+    auto indexes = std::make_shared<std::vector<uint32_t>>(10, 0);
+    ASSERT_OK(source(0)->add_chunk(make_chunk(10), indexes, 0, 10, kInitialPerDriver));
+    ASSERT_FALSE(_memory_manager->is_memory_full());
+    ASSERT_TRUE(source(0)->has_output());
+
+    ASSERT_OK(source(0)->pull_chunk(_runtime_state.get()).status());
+    ASSERT_EQ(2 * kInitialPerDriver, _exchanger->get_current_limit_per_driver());
+    ASSERT_EQ(1, _exchanger->get_buffer_grow_count());
+}
+
+TEST_F(LocalExchangeAdaptiveBufferTest, source_flush_of_full_chunk_does_not_grow_buffer) {
+    build_exchange();
+
+    // chunk_size rows are enough to assemble a full chunk, so the limit is not the problem.
+    auto rows = _runtime_state->chunk_size();
+    auto indexes = std::make_shared<std::vector<uint32_t>>(rows, 0);
+    ASSERT_OK(source(0)->add_chunk(make_chunk(rows), indexes, 0, rows, 10));
+    ASSERT_TRUE(source(0)->has_output());
+
+    ASSERT_OK(source(0)->pull_chunk(_runtime_state.get()).status());
+    ASSERT_EQ(0, _exchanger->get_buffer_grow_count());
 }
 
 TEST_F(LocalExchangeAdaptiveBufferTest, source_flush_threshold_is_fixed_in_release_mode) {
